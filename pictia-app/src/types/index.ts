@@ -17,6 +17,42 @@ export interface UserProfile {
   quotaLimit: number;
 }
 
+// Authentication service interface
+export interface AuthService {
+  authenticate(): Promise<AuthResult>;
+  refreshToken(): Promise<string>;
+  logout(): Promise<void>;
+  isAuthenticated(): boolean;
+}
+
+// Authentication error types
+export enum AuthErrorType {
+  INVALID_CREDENTIALS = 'invalid_credentials',
+  TOKEN_EXPIRED = 'token_expired',
+  NETWORK_ERROR = 'network_error',
+  PERMISSION_DENIED = 'permission_denied',
+  INVALID_REDIRECT_URI = 'invalid_redirect_uri',
+  SCOPE_INSUFFICIENT = 'scope_insufficient',
+  USER_CANCELLED = 'user_cancelled',
+  UNKNOWN_ERROR = 'unknown_error'
+}
+
+// Serializable auth error for Redux state
+export interface AuthError {
+  type: AuthErrorType;
+  message: string;
+  timestamp: number;
+}
+
+// Authentication state types
+export interface AuthState {
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  user: UserProfile | null;
+  accessToken: string | null;
+  error: AuthError | null;
+}
+
 // Media types
 export interface MediaItem {
   id: string;

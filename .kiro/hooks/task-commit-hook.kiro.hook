@@ -4,7 +4,7 @@
   "description": "Monitors code files for changes and prompts to commit after task completion with user confirmation. Add the same description as task.",
   "version": "1",
   "when": {
-    "type": "fileEdited",
+    "type": "userTriggered",
     "patterns": [
       "pictia-app/src/**/*.ts",
       "pictia-app/src/**/*.tsx",

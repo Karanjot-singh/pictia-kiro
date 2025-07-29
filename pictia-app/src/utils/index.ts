@@ -39,3 +39,6 @@ export const generateId = (): string => {
 export const delay = (ms: number): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
+
+// Export auth error utilities
+export * from './authErrors';
