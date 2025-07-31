@@ -1,5 +1,8 @@
 // Common type definitions for the application
 
+// Re-export Google Photos types
+export * from './googlePhotos';
+
 // Authentication types
 export interface AuthResult {
   accessToken: string;
@@ -51,36 +54,6 @@ export interface AuthState {
   user: UserProfile | null;
   accessToken: string | null;
   error: AuthError | null;
-}
-
-// Media types
-export interface MediaItem {
-  id: string;
-  filename: string;
-  mimeType: string;
-  baseUrl: string;
-  mediaMetadata: MediaMetadata;
-}
-
-export interface MediaMetadata {
-  creationTime: string;
-  width: string;
-  height: string;
-  photo?: PhotoMetadata;
-  video?: VideoMetadata;
-}
-
-export interface PhotoMetadata {
-  cameraMake?: string;
-  cameraModel?: string;
-  focalLength?: number;
-  apertureFNumber?: number;
-  isoEquivalent?: number;
-}
-
-export interface VideoMetadata {
-  fps?: number;
-  status?: string;
 }
 
 // Organization types

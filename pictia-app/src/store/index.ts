@@ -3,6 +3,7 @@ import authSlice from './slices/authSlice';
 import organizationSlice from './slices/organizationSlice';
 import backupSlice from './slices/backupSlice';
 import { baseApi } from './api/baseApi';
+import { googlePhotosApi } from './api/googlePhotosApi';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     organization: organizationSlice,
     backup: backupSlice,
     [baseApi.reducerPath]: baseApi.reducer,
+    [googlePhotosApi.reducerPath]: googlePhotosApi.reducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
@@ -17,7 +19,7 @@ export const store = configureStore({
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
         // All our auth errors are now serializable
       },
-    }).concat(baseApi.middleware),
+    }).concat(baseApi.middleware, googlePhotosApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

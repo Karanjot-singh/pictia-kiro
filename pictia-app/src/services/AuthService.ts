@@ -39,17 +39,29 @@ const SCOPES = [
 ];
 
 export class GoogleAuthService implements AuthService {
-  private discovery = AuthSession.makeRedirectUri();
-
   private authRequest: AuthSession.AuthRequest;
+  private redirectUri: string;
 
   constructor() {
+    // Get the default redirect URI
+    const defaultRedirectUri = AuthSession.makeRedirectUri();
+    
+    // If it's an exp:// URI (Expo Go), replace with HTTPS proxy
+    if (defaultRedirectUri.startsWith('exp://')) {
+      // Use Expo's auth proxy for Google OAuth compliance with your username
+      this.redirectUri = `https://auth.expo.io/@6singhk6/pictia-app`;
+    } else {
+      this.redirectUri = defaultRedirectUri;
+    }
+    
+    console.log('🔗 OAuth Redirect URI:', this.redirectUri);
+
     // Initialize the auth request
     this.authRequest = new AuthSession.AuthRequest({
       clientId: GOOGLE_CLIENT_ID,
       scopes: SCOPES,
       responseType: AuthSession.ResponseType.Code,
-      redirectUri: this.discovery,
+      redirectUri: this.redirectUri,
       extraParams: {
         access_type: 'offline', // Required for refresh tokens
         prompt: 'consent', // Force consent screen to get refresh token
@@ -62,18 +74,38 @@ export class GoogleAuthService implements AuthService {
    */
   async authenticate(): Promise<AuthResult> {
     try {
+      console.log('🚀 Starting authentication...');
+      
       // Validate configuration first
       validateConfig();
+      console.log('✅ Configuration validated');
       
       // Clear any existing error state
       await this.clearStoredTokens();
+      console.log('✅ Cleared stored tokens');
 
-      // Perform the authentication request
-      const result = await this.authRequest.promptAsync({
+      // Use manual discovery configuration to avoid network issues
+      console.log('🔍 Using manual discovery configuration...');
+      const discovery = {
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+        userInfoEndpoint: 'https://www.googleapis.com/oauth2/v2/userinfo',
+      };
+      console.log('✅ Discovery configuration set');
+      
+      console.log('🔐 Prompting for authentication...');
+      console.log('🔧 Auth request config:', {
+        clientId: GOOGLE_CLIENT_ID ? 'SET' : 'MISSING',
+        redirectUri: this.redirectUri,
+        scopes: SCOPES
       });
+      
+      const result = await this.authRequest.promptAsync(discovery);
+      console.log('📱 Authentication result:', JSON.stringify(result, null, 2));
 
       if (result.type === 'success' && result.params?.code) {
+        console.log('✅ Authentication successful, exchanging code for tokens...');
         // Exchange authorization code for tokens
         const tokenResult = await this.exchangeCodeForTokens(result.params.code);
         
@@ -91,14 +123,16 @@ export class GoogleAuthService implements AuthService {
           user: userProfile,
         };
       } else if (result.type === 'cancel') {
+        console.log('❌ Authentication cancelled by user');
         throw createAuthError(
           AuthErrorType.USER_CANCELLED,
           'Authentication was cancelled by user'
         );
       } else {
+        console.log('❌ Authentication failed:', result);
         throw createAuthError(
           AuthErrorType.UNKNOWN_ERROR,
-          'Authentication failed',
+          `Authentication failed: ${result.type}`,
           result
         );
       }
@@ -239,6 +273,14 @@ export class GoogleAuthService implements AuthService {
   // Private helper methods
 
   private async exchangeCodeForTokens(code: string): Promise<any> {
+    console.log('🔄 Exchanging code for tokens...');
+    console.log('📝 Request details:', {
+      client_id: GOOGLE_CLIENT_ID ? 'SET' : 'MISSING',
+      client_secret: GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING',
+      redirect_uri: this.redirectUri,
+      code: code ? 'RECEIVED' : 'MISSING'
+    });
+
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -249,13 +291,30 @@ export class GoogleAuthService implements AuthService {
         client_secret: GOOGLE_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: this.discovery,
+        redirect_uri: this.redirectUri,
       }).toString(),
     });
 
+    console.log('📡 Token exchange response status:', response.status);
+    
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = response.headers.get('content-type');
+    console.log('📄 Response content-type:', contentType);
+    
+    if (contentType?.includes('text/html')) {
+      const htmlText = await response.text();
+      console.log('❌ Received HTML instead of JSON:', htmlText.substring(0, 200));
+      throw createAuthError(
+        AuthErrorType.INVALID_REDIRECT_URI,
+        'OAuth configuration error: received HTML response instead of JSON'
+      );
+    }
+
     const tokenData = await response.json();
+    console.log('📦 Token data received:', tokenData.access_token ? 'SUCCESS' : 'FAILED');
 
     if (!response.ok) {
+      console.log('❌ Token exchange failed:', tokenData);
       throw createAuthError(
         mapErrorToAuthErrorType(tokenData),
         tokenData.error_description || 'Token exchange failed',

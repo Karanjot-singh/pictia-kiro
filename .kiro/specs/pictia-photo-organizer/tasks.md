@@ -29,15 +29,15 @@
     - Create AuthNavigator to handle authentication flow
     - _Requirements: 1.1, 1.4, 1.5_
 
-- [ ] 3. Google Photos API Integration
-  - [ ] 3.1 Create Google Photos API client
+- [-] 3. Google Photos API Integration
+  - [x] 3.1 Create Google Photos API client
     - Implement GooglePhotosClient class with 2024 API updates
     - Add methods for getMediaItems, uploadMediaItem, and batchCreateMediaItems
     - Implement proper error handling for API rate limits and quota exceeded
     - Create API response type definitions and validation
     - _Requirements: 1.3, 2.5, 6.2, 8.2_
 
-  - [ ] 3.2 Implement media data models and caching
+  - [x] 3.2 Implement media data models and caching
     - Create MediaItem, MediaMetadata, and related TypeScript interfaces
     - Implement RTK Query for API caching and data fetching
     - Add pagination support for large photo collections
@@ -88,7 +88,7 @@
     - Create backup status indicators and completion notifications
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 6. Notification System
+- [-] 6. Notification System
   - [ ] 6.1 Implement push notification service
     - Set up Expo Notifications with proper permissions handling
     - Create notification scheduling for backup reminders

@@ -1,6 +1,7 @@
 // Export all services from this file
 export { GoogleAuthService } from './AuthService';
 export { MockAuthService, mockAuthService } from './MockAuthService';
+export { GooglePhotosClient, createGooglePhotosClient } from './GooglePhotosClient';
 
 // Create and export the appropriate auth service based on configuration
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
