@@ -3,13 +3,13 @@ import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { MainTabParamList } from '@/types';
+import { SettingsScreen } from '@/screens';
+import { useAppSelector } from '@/store/hooks';
+import { selectIsLocalMode } from '@/store/selectors/authSelectors';
 
-// Placeholder screens - will be implemented in later tasks
-const OrganizeScreen: React.FC = () => (
-  <View style={styles.placeholderContainer}>
-    <Text style={styles.placeholderText}>Organize Screen - Coming Soon</Text>
-  </View>
-);
+// Import organize screens
+import { OrganizeScreen } from '@/screens';
+import LocalOrganizeScreen from '@/screens/LocalOrganizeScreen';
 
 const BackupScreen: React.FC = () => (
   <View style={styles.placeholderContainer}>
@@ -23,15 +23,16 @@ const UploadScreen: React.FC = () => (
   </View>
 );
 
-const SettingsScreen: React.FC = () => (
-  <View style={styles.placeholderContainer}>
-    <Text style={styles.placeholderText}>Settings Screen - Coming Soon</Text>
-  </View>
-);
+// SettingsScreen is now imported from @/screens
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainNavigator: React.FC = () => {
+  const isLocalMode = useAppSelector(selectIsLocalMode);
+
+  // Choose the appropriate organize screen based on mode
+  const OrganizeComponent = isLocalMode ? LocalOrganizeScreen : OrganizeScreen;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -57,9 +58,15 @@ const MainNavigator: React.FC = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Organize" component={OrganizeScreen} />
-      <Tab.Screen name="Backup" component={BackupScreen} />
-      <Tab.Screen name="Upload" component={UploadScreen} />
+      <Tab.Screen 
+        name="Organize" 
+        component={OrganizeComponent}
+        options={{
+          tabBarLabel: isLocalMode ? 'Local Gallery' : 'Organize',
+        }}
+      />
+      {!isLocalMode && <Tab.Screen name="Backup" component={BackupScreen} />}
+      {!isLocalMode && <Tab.Screen name="Upload" component={UploadScreen} />}
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

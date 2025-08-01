@@ -13,7 +13,7 @@ import {
   selectIsAuthenticated 
 } from '@/store/selectors/authSelectors';
 import { authenticateUser } from '@/store/thunks/authThunks';
-import { clearError } from '@/store/slices/authSlice';
+import { clearError, setLocalMode } from '@/store/slices/authSlice';
 import { ErrorDisplay } from '@/components';
 
 const LoginScreen: React.FC = () => {
@@ -45,7 +45,7 @@ const LoginScreen: React.FC = () => {
       <View style={styles.content}>
         <Text style={styles.title}>Welcome to Pictia</Text>
         <Text style={styles.subtitle}>
-          Sign in with Google to organize your photos
+          Sign in with Google to organize your photos, or use local gallery mode
         </Text>
         
         {!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || 
@@ -73,6 +73,13 @@ const LoginScreen: React.FC = () => {
               <Text style={styles.googleButtonText}>Sign in with Google</Text>
             </>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.skipButton}
+          onPress={() => dispatch(setLocalMode(true))}
+        >
+          <Text style={styles.skipButtonText}>Skip - Use Local Gallery Only</Text>
         </TouchableOpacity>
 
         {error && (
@@ -144,6 +151,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  skipButton: {
+    backgroundColor: '#6c757d',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 200,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
 
   footer: {

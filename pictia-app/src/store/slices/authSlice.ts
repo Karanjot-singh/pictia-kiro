@@ -9,6 +9,7 @@ import {
 
 const initialState: AuthState = {
   isAuthenticated: false,
+  isLocalMode: false,
   user: null,
   accessToken: null,
   isLoading: false,
@@ -24,6 +25,22 @@ const authSlice = createSlice({
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
+    },
+    setLocalMode: (state, action: PayloadAction<boolean>) => {
+      state.isLocalMode = action.payload;
+      if (action.payload) {
+        // In local mode, we consider the user "authenticated" for navigation purposes
+        state.isAuthenticated = true;
+        state.user = {
+          id: 'local-user',
+          email: 'local@device.com',
+          name: 'Local User',
+          quotaUsed: 0,
+          quotaLimit: 0,
+        };
+        state.accessToken = null;
+        state.error = null;
+      }
     },
   },
   extraReducers: builder => {
@@ -74,6 +91,7 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.fulfilled, state => {
         state.isAuthenticated = false;
+        state.isLocalMode = false;
         state.user = null;
         state.accessToken = null;
         state.isLoading = false;
@@ -82,6 +100,7 @@ const authSlice = createSlice({
       .addCase(logoutUser.rejected, (state, action) => {
         // Even if logout fails, clear the state
         state.isAuthenticated = false;
+        state.isLocalMode = false;
         state.user = null;
         state.accessToken = null;
         state.isLoading = false;
@@ -119,6 +138,7 @@ const authSlice = createSlice({
 
 export const { 
   clearError,
-  setLoading
+  setLoading,
+  setLocalMode
 } = authSlice.actions;
 export default authSlice.reducer;

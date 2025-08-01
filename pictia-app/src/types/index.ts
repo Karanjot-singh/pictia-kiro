@@ -50,6 +50,7 @@ export interface AuthError {
 // Authentication state types
 export interface AuthState {
   isAuthenticated: boolean;
+  isLocalMode: boolean; // New field for local-only mode
   isLoading: boolean;
   user: UserProfile | null;
   accessToken: string | null;
@@ -84,6 +85,76 @@ export interface BackupLog {
   itemsUploaded: number;
   totalItems: number;
   errorMessage?: string;
+}
+
+export interface BackupProgress {
+  backupId: string;
+  currentItem: number;
+  totalItems: number;
+  currentFileName: string;
+  bytesUploaded: number;
+  totalBytes: number;
+  percentage: number;
+  estimatedTimeRemaining?: number;
+  uploadSpeed?: number; // bytes per second
+}
+
+// Upload types
+export interface MediaPickerResult {
+  uri: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  width?: number;
+  height?: number;
+}
+
+export interface UploadItem {
+  id: string;
+  file: MediaPickerResult;
+  status: 'pending' | 'uploading' | 'completed' | 'failed';
+  progress: number;
+  uploadToken?: string;
+  error?: string;
+  mediaItem?: any; // MediaItem from Google Photos API
+}
+
+export interface UploadSession {
+  id: string;
+  items: UploadItem[];
+  startTime: Date;
+  endTime?: Date;
+  totalItems: number;
+  completedItems: number;
+  failedItems: number;
+}
+
+// App preferences types
+export interface AppPreferences {
+  theme: 'light' | 'dark' | 'system';
+  language: string;
+  autoBackupEnabled: boolean;
+  highQualityUploads: boolean;
+  wifiOnlyUploads: boolean;
+  showOnboardingTips: boolean;
+  enableAnalytics: boolean;
+  enableCrashReporting: boolean;
+  maxCacheSize: number; // in MB
+  undoTimeoutSeconds: number;
+  gestureThreshold: number;
+  hapticFeedbackEnabled: boolean;
+}
+
+export interface SettingsValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface SettingsError {
+  field: string;
+  message: string;
+  type: 'validation' | 'storage' | 'network';
 }
 
 // Navigation types

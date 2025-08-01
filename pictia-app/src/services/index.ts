@@ -2,6 +2,31 @@
 export { GoogleAuthService } from './AuthService';
 export { MockAuthService, mockAuthService } from './MockAuthService';
 export { GooglePhotosClient, createGooglePhotosClient } from './GooglePhotosClient';
+export { NotificationService } from './NotificationService';
+export { BackupService } from './BackupService';
+export { BackupScheduler } from './BackupScheduler';
+export { BackupLogger } from './BackupLogger';
+export { SettingsService } from './SettingsService';
+export type { 
+  NotificationConfig, 
+  BackupReminder, 
+  NotificationPermissionStatus 
+} from './NotificationService';
+export type {
+  BackupProgress,
+  BackupQueueItem,
+  BackupResult,
+  BackupServiceConfig
+} from './BackupService';
+export type {
+  ScheduledBackupInfo,
+  BackupScheduleHistory
+} from './BackupScheduler';
+export type {
+  BackupLogEntry,
+  BackupErrorDetails,
+  BackupStatistics
+} from './BackupLogger';
 
 // Create and export the appropriate auth service based on configuration
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '';
@@ -19,3 +44,16 @@ if (isGoogleConfigured) {
 }
 
 export { authService };
+
+// Service initialization utilities
+export {
+  serviceContainer,
+  initializeServices,
+  getBackupService,
+  getBackupScheduler,
+  getGooglePhotosClient,
+  getNotificationService,
+  updateServicesAccessToken,
+  cleanupServices,
+  areServicesInitialized
+} from './serviceInitializer';

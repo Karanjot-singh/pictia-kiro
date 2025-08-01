@@ -22,6 +22,7 @@ interface SwipeCardProps {
   onSwipeRight: (item: CachedMediaItem) => void;
   config?: Partial<GestureConfigOptions>;
   style?: any;
+  undoTimeoutMs?: number;
 }
 
 const SwipeCard: React.FC<SwipeCardProps> = ({
@@ -30,6 +31,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   onSwipeRight,
   config = {},
   style,
+  undoTimeoutMs = 5000,
 }) => {
   // Default configuration
   const defaultConfig: GestureConfigOptions = {

@@ -1,3 +1,9 @@
 // Export all screens from this file
-// This will be populated as screens are created
-export {};
+export { default as OrganizeScreen } from './OrganizeScreen';
+export { default as SettingsScreen } from './SettingsScreen';
+export { UploadScreen } from './UploadScreen';
+export { BackupScreen } from './BackupScreen';
+
+// Auth screens
+export { default as LoginScreen } from './auth/LoginScreen';
+export { default as AuthLoadingScreen } from './auth/AuthLoadingScreen';

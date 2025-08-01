@@ -19,6 +19,7 @@ interface SwipeCardStackProps {
   enableHaptics?: boolean;
   maxVisibleCards?: number;
   cardSpacing?: number;
+  undoTimeoutMs?: number;
 }
 
 const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
@@ -30,6 +31,7 @@ const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
   enableHaptics = true,
   maxVisibleCards = 3,
   cardSpacing = 8,
+  undoTimeoutMs = 5000,
 }) => {
   const cardAnimations = useRef<Animated.Value[]>([]).current;
 
@@ -153,8 +155,11 @@ const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
           mediaItem={item}
           onSwipeLeft={handleSwipeLeft}
           onSwipeRight={handleSwipeRight}
-          swipeThreshold={swipeThreshold}
-          enableHaptics={enableHaptics}
+          config={{
+            swipeThreshold,
+            enableHaptics,
+          }}
+          undoTimeoutMs={undoTimeoutMs}
         />
       </Animated.View>
     );

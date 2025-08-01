@@ -36,9 +36,11 @@ graph TB
 - **API Integration**: Google Photos Library API v1 (with latest 2024 updates)
 - **Local Storage**: Expo SecureStore for tokens, AsyncStorage for app data
 - **Notifications**: Expo Notifications
-- **Navigation**: React Navigation v6
+- **Navigation**: React Navigation v6 (Bottom Tab + Stack Navigation)
 - **UI Components**: React Native Elements + custom components
-- **Gesture Handling**: React Native Gesture Handler for swipe interactions
+- **Gesture Handling**: React Native Gesture Handler for swipe interactions and gallery gestures
+- **Image Handling**: React Native Fast Image for optimized gallery performance
+- **Zoom/Pan**: React Native Reanimated for smooth zoom and pan gestures
 
 ### Important API Updates & Developer Configuration Notes
 
@@ -63,6 +65,38 @@ graph TB
    - Ensure redirect URLs match exactly (case-sensitive)
 
 ## Components and Interfaces
+
+### Gallery Mode Architecture
+
+The gallery mode provides an iOS Photos-like experience with grid view, full-screen viewing, and multi-selection capabilities. The design emphasizes performance with virtualized lists and efficient image loading.
+
+#### Gallery Flow Design
+```mermaid
+graph TD
+    A[Gallery Grid View] --> B[Photo Thumbnail Tap]
+    A --> C[Long Press Multi-Select]
+    B --> D[Full Screen Viewer]
+    C --> E[Batch Actions Bar]
+    D --> F[Start Swipe Mode Button]
+    F --> G[Organization Session]
+    G --> H[Swipe Interface]
+    H --> I[Session Exit Modal]
+    I --> J[Commit/Discard Choice]
+    E --> K[Batch Delete Confirmation]
+```
+
+#### Review Tracking System
+The app maintains a persistent record of which photos have been reviewed to avoid showing them again in natural organization mode:
+
+```typescript
+interface ReviewTracker {
+  markAsReviewed(mediaItemId: string, action?: 'keep' | 'delete'): void
+  isReviewed(mediaItemId: string): boolean
+  getUnreviewedPhotos(allPhotos: MediaItem[]): MediaItem[]
+  clearReviewHistory(): void
+  getReviewStats(): { total: number, reviewed: number, kept: number, deleted: number }
+}
+```
 
 ### Core Components
 
@@ -120,23 +154,69 @@ interface MediaItem {
 }
 ```
 
-#### 3. Swipe Organization Interface
+#### 3. Gallery Interface
+```typescript
+interface GalleryView {
+  mediaItems: MediaItem[]
+  selectedItems: Set<string>
+  reviewedItems: Set<string>
+  isMultiSelectMode: boolean
+  onPhotoSelect: (item: MediaItem) => void
+  onStartSwipeMode: (startingItem: MediaItem) => void
+  onBatchDelete: (items: MediaItem[]) => void
+}
+
+interface FullScreenViewer {
+  currentItem: MediaItem
+  onZoom: (scale: number) => void
+  onPan: (x: number, y: number) => void
+  onStartSwipeMode: () => void
+  onNavigate: (direction: 'prev' | 'next') => void
+}
+
+interface PhotoThumbnail {
+  mediaItem: MediaItem
+  isSelected: boolean
+  isReviewed: boolean
+  onPress: () => void
+  onLongPress: () => void
+}
+```
+
+#### 4. Enhanced Swipe Organization Interface
 ```typescript
 interface SwipeCard {
   mediaItem: MediaItem
   onSwipeLeft: (item: MediaItem) => void
   onSwipeRight: (item: MediaItem) => void
-  onUndo: () => void
-  undoTimeoutMs: number
+  showActionBar: boolean
 }
 
-interface OrganizationState {
+interface OrganizationSession {
+  id: string
+  startingPhotoId?: string
   currentIndex: number
   mediaItems: MediaItem[]
   keepItems: MediaItem[]
   deleteItems: MediaItem[]
-  lastAction: SwipeAction | null
-  undoAvailable: boolean
+  pendingActions: SwipeAction[]
+  isCommitted: boolean
+  startMode: 'gallery' | 'natural'
+}
+
+interface SwipeAction {
+  mediaItemId: string
+  action: 'keep' | 'delete'
+  timestamp: Date
+  canUndo: boolean
+}
+
+interface SessionExitModal {
+  isVisible: boolean
+  pendingActionsCount: number
+  onCommit: () => Promise<void>
+  onDiscard: () => void
+  onCancel: () => void
 }
 ```
 
@@ -165,11 +245,23 @@ App
 ├── AuthNavigator
 │   ├── LoginScreen
 │   └── AuthLoadingScreen
-└── MainNavigator
-    ├── OrganizeScreen
+└── MainNavigator (Bottom Tab Navigator)
+    ├── GalleryScreen (Tab: "Organise")
+    │   ├── PhotoGrid
+    │   │   ├── PhotoThumbnail (with review checkmark)
+    │   │   └── MultiSelectOverlay
+    │   ├── FullScreenViewer
+    │   │   ├── ZoomableImage
+    │   │   ├── StartSwipeModeButton
+    │   │   └── NavigationControls
+    │   └── BatchActionBar
+    ├── OrganizeScreen (Enhanced Swipe Mode)
     │   ├── SwipeCardStack
-    │   ├── UndoButton
-    │   └── ProgressIndicator
+    │   ├── CardActionBar
+    │   │   ├── UndoIcon
+    │   │   └── CommitIcon
+    │   ├── ProgressIndicator
+    │   └── SessionExitModal
     ├── BackupScreen
     │   ├── BackupControls
     │   ├── ScheduleSettings
@@ -200,23 +292,42 @@ interface UserProfile {
 }
 ```
 
-#### Media Organization
+#### Media Organization and Review Tracking
 ```typescript
+interface MediaReviewStatus {
+  mediaItemId: string
+  isReviewed: boolean
+  lastReviewedAt: Date
+  reviewAction?: 'keep' | 'delete'
+}
+
 interface MediaOrganization {
   mediaItemId: string
   action: 'keep' | 'delete'
   timestamp: Date
-  undoExpiry?: Date
+  sessionId: string
+  isCommitted: boolean
 }
 
 interface OrganizationSession {
   id: string
   startTime: Date
   endTime?: Date
+  startingPhotoId?: string
+  startMode: 'gallery' | 'natural'
   totalItems: number
   processedItems: number
   keepCount: number
   deleteCount: number
+  isCommitted: boolean
+  pendingActions: MediaOrganization[]
+}
+
+interface GalleryState {
+  selectedPhotos: Set<string>
+  reviewedPhotos: Set<string>
+  isMultiSelectMode: boolean
+  currentViewingPhoto?: string
 }
 ```
 
@@ -255,6 +366,9 @@ interface BackupProgress {
 - `organization_sessions`: Historical organization sessions
 - `backup_logs`: Backup history and logs
 - `app_preferences`: User preferences and settings
+- `media_review_status`: Tracking of reviewed photos with timestamps
+- `gallery_state`: Gallery selection and view state
+- `pending_organization_sessions`: Uncommitted organization sessions
 
 ## Error Handling
 

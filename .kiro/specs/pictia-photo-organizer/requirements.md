@@ -18,23 +18,41 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. IF authentication fails THEN the system SHALL display an appropriate error message and allow retry
 5. WHEN a user is already authenticated THEN the system SHALL automatically log them in on app launch
 
-### Requirement 2: Media Organization Interface
+### Requirement 2: Gallery Mode Interface
 
-**User Story:** As a user, I want to organize my photos through an intuitive swipe-based interface with undo capability, so that I can quickly categorize or delete photos while being able to correct accidental actions.
+**User Story:** As a user, I want to browse my photos in a gallery view similar to iOS Photos app with multi-selection capabilities, so that I can quickly review, select, and manage multiple photos at once.
+
+#### Acceptance Criteria
+
+1. WHEN a user accesses the gallery tab THEN the system SHALL display photos in a grid layout with thumbnails
+2. WHEN a user taps on a photo THEN the system SHALL open it in full-screen view with zoom capabilities
+3. WHEN in full-screen view THEN the system SHALL support pinch-to-zoom and pan gestures
+4. WHEN a user long-presses on photos THEN the system SHALL enable multi-selection mode
+5. WHEN in multi-selection mode THEN the system SHALL allow batch operations like delete
+6. WHEN photos have been reviewed THEN the system SHALL display a small green checkmark on thumbnails
+7. WHEN a user taps "Start Swipe Mode" in full-screen view THEN the system SHALL launch organization mode starting from that photo
+8. WHEN the gallery loads THEN the system SHALL fetch photos from Google Photos API with efficient pagination
+
+### Requirement 3: Enhanced Swipe Organization Interface
+
+**User Story:** As a user, I want to organize my photos through an intuitive swipe-based interface with improved controls and session management, so that I can efficiently categorize photos with better control over the process.
 
 #### Acceptance Criteria
 
 1. WHEN a user accesses the organization interface THEN the system SHALL display photos one at a time in a card-based layout
 2. WHEN a user swipes right on a photo THEN the system SHALL mark it for keeping/organizing
 3. WHEN a user swipes left on a photo THEN the system SHALL mark it for deletion or removal
-4. WHEN a user performs a swipe action THEN the system SHALL display an undo button for a configurable time period
-5. WHEN a user taps the undo button THEN the system SHALL reverse the last swipe action and restore the photo to the interface
-6. WHEN the undo time period expires THEN the system SHALL hide the undo button and commit the action
-7. WHEN a user completes swiping actions THEN the system SHALL save the organization decisions locally
-8. WHEN the interface loads THEN the system SHALL fetch photos from Google Photos API
-9. IF no more photos are available THEN the system SHALL display a completion message
+4. WHEN a user performs a swipe action THEN the system SHALL display an undo icon on the top of the card
+5. WHEN a user taps the undo icon THEN the system SHALL reverse the last swipe action and restore the photo to the interface
+6. WHEN a user taps the commit icon THEN the system SHALL permanently apply all marked actions in the current session
+7. WHEN organization starts from gallery THEN the system SHALL begin with the selected photo and continue to most recent
+8. WHEN organization starts naturally THEN the system SHALL show unreviewed photos from oldest to most recent
+9. WHEN a user leaves organization mode without committing THEN the system SHALL show a popup to commit or discard the session
+10. WHEN the interface loads THEN the system SHALL fetch photos from Google Photos API
+11. WHEN the system tracks reviewed photos THEN it SHALL not show already reviewed items in natural organization mode
+12. IF no more unreviewed photos are available THEN the system SHALL display a completion message
 
-### Requirement 3: Cross-Platform Compatibility
+### Requirement 4: Cross-Platform Compatibility
 
 **User Story:** As a user, I want the app to work seamlessly on both Android and iOS devices, so that I can use it regardless of my mobile platform.
 
@@ -46,7 +64,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN using platform-specific features THEN the system SHALL handle platform differences gracefully
 5. WHEN testing core functionality THEN the system SHALL behave consistently across both platforms
 
-### Requirement 4: Scheduled Backup Automation
+### Requirement 5: Scheduled Backup Automation
 
 **User Story:** As a user, I want to schedule automated backups of my organized photos, so that my media is regularly backed up to Google Photos without manual intervention.
 
@@ -58,7 +76,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN a backup is scheduled THEN the system SHALL upload organized photos to Google Photos via API
 5. IF a backup fails THEN the system SHALL retry and log the error for user review
 
-### Requirement 5: Notification and Reminder System
+### Requirement 6: Notification and Reminder System
 
 **User Story:** As a user, I want to receive customizable notifications reminding me to organize photos before scheduled backups, so that I stay on top of my photo management routine.
 
@@ -70,7 +88,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN a user taps a notification THEN the system SHALL open the app to the organization interface
 5. IF notifications are disabled THEN the system SHALL respect user preferences and not send reminders
 
-### Requirement 6: Manual Backup Control
+### Requirement 7: Manual Backup Control
 
 **User Story:** As a user, I want to manually trigger backups at any time, so that I have control over when my photos are backed up independent of scheduled backups.
 
@@ -82,7 +100,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN manual backup completes THEN the system SHALL show a success confirmation
 5. IF manual backup fails THEN the system SHALL display error details and allow retry
 
-### Requirement 7: Backup Status and Logging
+### Requirement 8: Backup Status and Logging
 
 **User Story:** As a user, I want to view backup progress and history, so that I can track the status of my backups and troubleshoot any issues.
 
@@ -94,7 +112,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN backup errors occur THEN the system SHALL log error details with timestamps
 5. WHEN viewing backup logs THEN the system SHALL allow users to filter by date range or status
 
-### Requirement 8: Photo Upload Management
+### Requirement 9: Photo Upload Management
 
 **User Story:** As a user, I want a dedicated interface to manually upload photos and configure backup settings, so that I have granular control over my photo management workflow.
 
@@ -106,7 +124,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN upload is in progress THEN the system SHALL show progress indicators for each file
 5. WHEN uploads complete THEN the system SHALL confirm successful uploads and update local records
 
-### Requirement 9: Data Security and Privacy
+### Requirement 10: Data Security and Privacy
 
 **User Story:** As a user, I want my authentication tokens and personal data to be handled securely, so that my privacy and account security are protected.
 
@@ -118,7 +136,7 @@ Pictia is a cross-platform mobile application (Android + iOS) built with React N
 4. WHEN the app is uninstalled THEN the system SHALL properly clean up stored credentials
 5. IF tokens expire THEN the system SHALL handle refresh tokens securely and transparently
 
-### Requirement 10: Performance and Reliability
+### Requirement 11: Performance and Reliability
 
 **User Story:** As a user, I want the app to perform smoothly and reliably, so that I can efficiently manage my photos without frustration.
 

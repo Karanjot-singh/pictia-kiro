@@ -2,6 +2,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import authSlice from './slices/authSlice';
 import organizationSlice from './slices/organizationSlice';
 import backupSlice from './slices/backupSlice';
+import notificationSlice from './slices/notificationSlice';
+import settingsSlice from './slices/settingsSlice';
 import { baseApi } from './api/baseApi';
 import { googlePhotosApi } from './api/googlePhotosApi';
 
@@ -10,6 +12,8 @@ export const store = configureStore({
     auth: authSlice,
     organization: organizationSlice,
     backup: backupSlice,
+    notification: notificationSlice,
+    settings: settingsSlice,
     [baseApi.reducerPath]: baseApi.reducer,
     [googlePhotosApi.reducerPath]: googlePhotosApi.reducer,
   },

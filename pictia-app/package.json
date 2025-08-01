@@ -17,16 +17,22 @@
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-community/slider": "^4.5.7",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/stack": "^6.3.20",
     "@reduxjs/toolkit": "^2.0.1",
     "expo": "~53.0.20",
     "expo-auth-session": "~6.2.1",
+    "expo-background-fetch": "^13.1.6",
     "expo-crypto": "~14.1.5",
     "expo-haptics": "^14.1.4",
+    "expo-image-picker": "^16.1.4",
+    "expo-media-library": "^17.1.7",
+    "expo-notifications": "^0.31.4",
     "expo-secure-store": "~14.2.3",
     "expo-status-bar": "~2.2.3",
+    "expo-task-manager": "^13.1.6",
     "react": "19.0.0",
     "react-native": "0.79.5",
     "react-native-gesture-handler": "~2.24.0",
@@ -43,14 +49,12 @@
     "@types/react": "~19.0.10",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
-    "babel-jest": "^30.0.5",
     "eslint": "^8.54.0",
     "eslint-config-expo": "~9.2.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.1",
     "jest": "^30.0.5",
     "prettier": "^3.1.0",
-    "react-test-renderer": "^19.1.1",
     "typescript": "~5.8.3"
   },
   "jest": {
@@ -74,9 +78,9 @@
       "jsx",
       "json"
     ],
-    "transform": {
-      "^.+\\.(ts|tsx)$": "babel-jest"
-    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-native|@react-native|expo|@expo|@react-navigation)/)"
+    ],
     "testEnvironment": "node"
   },
   "private": true

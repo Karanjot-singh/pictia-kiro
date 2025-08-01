@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   Switch,
-  Slider,
   Dimensions,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -130,7 +130,7 @@ const GestureConfig: React.FC<GestureConfigProps> = ({
             minimumValue={10}
             maximumValue={45}
             value={config.maxRotationDegrees}
-            onValueChange={(value) => updateConfig('maxRotationDegrees', Math.round(value))}
+            onValueChange={(value: number) => updateConfig('maxRotationDegrees', Math.round(value))}
             step={5}
             minimumTrackTintColor="#007AFF"
             maximumTrackTintColor="#E5E5EA"
@@ -152,7 +152,7 @@ const GestureConfig: React.FC<GestureConfigProps> = ({
           minimumValue={200}
           maximumValue={600}
           value={config.animationDuration}
-          onValueChange={(value) => updateConfig('animationDuration', Math.round(value))}
+          onValueChange={(value: number) => updateConfig('animationDuration', Math.round(value))}
           step={50}
           minimumTrackTintColor="#007AFF"
           maximumTrackTintColor="#E5E5EA"
@@ -207,4 +207,3 @@ const styles = StyleSheet.create({
 });
 
 export default GestureConfig;
-export type { GestureConfigOptions };
