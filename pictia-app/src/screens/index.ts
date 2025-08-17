@@ -1,8 +1,6 @@
 // Export all screens from this file
 export { default as OrganizeScreen } from './OrganizeScreen';
-export { default as GalleryScreen } from './GalleryScreen';
 export { default as SettingsScreen } from './SettingsScreen';
-export { default as LocalOrganizeScreen } from './LocalOrganizeScreen';
 export { UploadScreen } from './UploadScreen';
 export { BackupScreen } from './BackupScreen';
 

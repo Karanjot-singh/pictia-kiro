@@ -8,7 +8,8 @@ import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
 
 // Import organize screens
-import { OrganizeScreen, LocalOrganizeScreen } from '@/screens';
+import { OrganizeScreen } from '@/screens';
+import LocalOrganizeScreen from '@/screens/LocalOrganizeScreen';
 
 const BackupScreen: React.FC = () => (
   <View style={styles.placeholderContainer}>

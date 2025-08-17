@@ -4,7 +4,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import SwipeCardStack from './SwipeCardStack';
-import CardActionBar from './CardActionBar';
+import UndoButton from './UndoButton';
 import { CachedMediaItem } from '../types';
 
 interface SwipeCardStackWithUndoProps {
@@ -13,16 +13,14 @@ interface SwipeCardStackWithUndoProps {
   onSwipeLeft: (item: CachedMediaItem) => void;
   onSwipeRight: (item: CachedMediaItem) => void;
   onUndo: () => void;
-  onCommit?: () => void;
   canUndo: boolean;
-  canCommit?: boolean;
   swipeThreshold?: number;
   enableHaptics?: boolean;
   maxVisibleCards?: number;
   cardSpacing?: number;
   undoTimeoutMs?: number;
-  showActionBar?: boolean;
-  actionBarPosition?: 'top' | 'bottom';
+  showUndoCountdown?: boolean;
+  undoPosition?: 'top' | 'bottom';
 }
 
 const SwipeCardStackWithUndo: React.FC<SwipeCardStackWithUndoProps> = ({
@@ -31,71 +29,57 @@ const SwipeCardStackWithUndo: React.FC<SwipeCardStackWithUndoProps> = ({
   onSwipeLeft,
   onSwipeRight,
   onUndo,
-  onCommit,
   canUndo,
-  canCommit = false,
   swipeThreshold,
   enableHaptics = true,
   maxVisibleCards = 3,
   cardSpacing = 8,
   undoTimeoutMs = 5000,
-  showActionBar: showActionBarProp = true,
-  actionBarPosition = 'bottom',
+  showUndoCountdown = true,
+  undoPosition = 'bottom',
 }) => {
-  const [showActionBar, setShowActionBar] = useState(false);
-  const [actionBarTimer, setActionBarTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showUndo, setShowUndo] = useState(false);
+  const [undoTimer, setUndoTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Handle action bar visibility based on canUndo or canCommit props
+  // Handle undo visibility based on canUndo prop
   useEffect(() => {
-    const shouldShow = canUndo || canCommit;
-    
-    if (shouldShow) {
-      setShowActionBar(true);
+    if (canUndo) {
+      setShowUndo(true);
       
       // Clear existing timer
-      if (actionBarTimer) {
-        clearTimeout(actionBarTimer);
+      if (undoTimer) {
+        clearTimeout(undoTimer);
       }
 
-      // Set new timer to hide action bar (only if just undo, not if commit is available)
-      if (canUndo && !canCommit) {
-        const timer = setTimeout(() => {
-          setShowActionBar(false);
-          setActionBarTimer(null);
-        }, undoTimeoutMs);
+      // Set new timer to hide undo button
+      const timer = setTimeout(() => {
+        setShowUndo(false);
+        setUndoTimer(null);
+      }, undoTimeoutMs);
 
-        setActionBarTimer(timer);
-      }
+      setUndoTimer(timer);
     } else {
-      setShowActionBar(false);
-      if (actionBarTimer) {
-        clearTimeout(actionBarTimer);
-        setActionBarTimer(null);
+      setShowUndo(false);
+      if (undoTimer) {
+        clearTimeout(undoTimer);
+        setUndoTimer(null);
       }
     }
 
     return () => {
-      if (actionBarTimer) {
-        clearTimeout(actionBarTimer);
+      if (undoTimer) {
+        clearTimeout(undoTimer);
       }
     };
-  }, [canUndo, canCommit, undoTimeoutMs]);
+  }, [canUndo, undoTimeoutMs]);
 
   const handleUndo = () => {
-    if (actionBarTimer) {
-      clearTimeout(actionBarTimer);
-      setActionBarTimer(null);
+    setShowUndo(false);
+    if (undoTimer) {
+      clearTimeout(undoTimer);
+      setUndoTimer(null);
     }
     onUndo();
-  };
-
-  const handleCommit = () => {
-    setShowActionBar(false);
-    if (actionBarTimer) {
-      clearTimeout(actionBarTimer);
-      setActionBarTimer(null);
-    }
-    onCommit?.();
   };
 
   const handleSwipeLeft = (item: CachedMediaItem) => {
@@ -113,22 +97,19 @@ const SwipeCardStackWithUndo: React.FC<SwipeCardStackWithUndoProps> = ({
         currentIndex={currentIndex}
         onSwipeLeft={handleSwipeLeft}
         onSwipeRight={handleSwipeRight}
-        onUndo={handleUndo}
-        onCommit={handleCommit}
         {...(swipeThreshold !== undefined && { swipeThreshold })}
         enableHaptics={enableHaptics}
         maxVisibleCards={maxVisibleCards}
         cardSpacing={cardSpacing}
         undoTimeoutMs={undoTimeoutMs}
-        showCardActionBar={showActionBarProp}
       />
       
-      <CardActionBar
-        visible={showActionBarProp && showActionBar}
-        onUndo={canUndo ? handleUndo : undefined}
-        onCommit={canCommit ? handleCommit : undefined}
-        position={actionBarPosition}
-        enableHaptics={enableHaptics}
+      <UndoButton
+        visible={showUndo}
+        onUndo={handleUndo}
+        timeoutMs={undoTimeoutMs}
+        showCountdown={showUndoCountdown}
+        position={undoPosition}
       />
     </View>
   );

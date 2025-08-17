@@ -51,58 +51,58 @@
     - Create media item validation and error handling
     - _Requirements: 2.5, 10.1, 10.4_
 
-- [x] 4. Gallery Mode Implementation
-  - [x] 4.1 Create photo grid and thumbnail components
+- [ ] 4. Gallery Mode Implementation
+  - [ ] 4.1 Create photo grid and thumbnail components
     - Implement PhotoGrid component with virtualized FlatList for performance
     - Create PhotoThumbnail component with review status indicators (green checkmarks)
     - Add efficient image loading and caching using React Native Fast Image
     - Implement grid layout with responsive sizing for different screen sizes
     - _Requirements: 2.1, 2.6, 11.1_
 
-  - [x] 4.2 Build full-screen photo viewer
+  - [ ] 4.2 Build full-screen photo viewer
     - Create FullScreenViewer component with zoom and pan capabilities using React Native Reanimated
     - Implement pinch-to-zoom and pan gestures with smooth animations
     - Add navigation controls for previous/next photo browsing
     - Create "Start Swipe Mode" button that launches organization from current photo
     - _Requirements: 2.2, 2.3, 2.7_
 
-  - [x] 4.3 Implement multi-selection and batch operations
+  - [ ] 4.3 Implement multi-selection and batch operations
     - Add long-press gesture to enable multi-selection mode
     - Create selection overlay with checkboxes and selection count
     - Implement BatchActionBar with delete and other batch operations
     - Add batch delete confirmation dialog with preview of selected items
     - _Requirements: 2.4, 2.5_
 
-  - [x] 4.4 Create review tracking system
+  - [ ] 4.4 Create review tracking system
     - Implement ReviewTracker service to manage reviewed photo status
     - Add persistent storage for review status using AsyncStorage
     - Create methods to mark photos as reviewed and filter unreviewed items
     - Integrate review status display with thumbnail checkmarks
     - _Requirements: 2.6, 3.11_
 
-- [-] 5. Enhanced Swipe Organization Interface
-  - [x] 5.1 Upgrade swipe gesture components
+- [ ] 5. Enhanced Swipe Organization Interface
+  - [ ] 5.1 Upgrade swipe gesture components
     - Enhance SwipeCard component with improved gesture handling
     - Remove popup confirmations and add inline action indicators
     - Implement smooth card transitions and visual feedback
     - Add haptic feedback for swipe actions and gesture thresholds
     - _Requirements: 3.1, 3.2, 3.3, 11.2_
 
-  - [x] 5.2 Create session-based organization system
+  - [ ] 5.2 Create session-based organization system
     - Implement OrganizationSession management with pending actions
     - Create session state tracking for commit/discard functionality
     - Add session persistence to handle app backgrounding
     - Implement smart photo ordering (from selected photo or unreviewed photos)
     - _Requirements: 3.7, 3.8, 3.9, 3.11_
 
-  - [x] 5.3 Build enhanced action controls
+  - [ ] 5.3 Build enhanced action controls
     - Replace UndoButton with inline undo icon on card top
     - Add commit icon next to undo for session management
     - Create CardActionBar component with undo and commit controls
     - Implement immediate action feedback without confirmation popups
     - _Requirements: 3.4, 3.5, 3.6_
 
-  - [x] 5.4 Implement session exit handling
+  - [ ] 5.4 Implement session exit handling
     - Create SessionExitModal for commit/discard choices when leaving
     - Add navigation guards to detect unsaved session changes
     - Implement session restoration when returning to organization mode

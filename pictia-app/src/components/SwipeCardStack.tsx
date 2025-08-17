@@ -15,14 +15,11 @@ interface SwipeCardStackProps {
   currentIndex: number;
   onSwipeLeft: (item: CachedMediaItem) => void;
   onSwipeRight: (item: CachedMediaItem) => void;
-  onUndo?: () => void;
-  onCommit?: () => void;
   swipeThreshold?: number;
   enableHaptics?: boolean;
   maxVisibleCards?: number;
   cardSpacing?: number;
   undoTimeoutMs?: number;
-  showCardActionBar?: boolean;
 }
 
 const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
@@ -30,14 +27,11 @@ const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
   currentIndex,
   onSwipeLeft,
   onSwipeRight,
-  onUndo,
-  onCommit,
   swipeThreshold = screenWidth * 0.3,
   enableHaptics = true,
   maxVisibleCards = 3,
   cardSpacing = 8,
   undoTimeoutMs = 5000,
-  showCardActionBar = false,
 }) => {
   const cardAnimations = useRef<Animated.Value[]>([]).current;
 
@@ -161,9 +155,6 @@ const SwipeCardStack: React.FC<SwipeCardStackProps> = ({
           mediaItem={item}
           onSwipeLeft={handleSwipeLeft}
           onSwipeRight={handleSwipeRight}
-          onUndo={isTopCard ? onUndo : undefined}
-          onCommit={isTopCard ? onCommit : undefined}
-          showActionBar={isTopCard && showCardActionBar}
           config={{
             swipeThreshold,
             enableHaptics,

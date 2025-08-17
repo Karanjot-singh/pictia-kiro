@@ -10,8 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
-import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '../components';
-import { useNavigationGuard } from '../hooks/useNavigationGuard';
+import { SwipeCardStackWithUndo } from '../components';
 import { RootState } from '../store';
 import {
   swipeAction,
@@ -19,18 +18,10 @@ import {
   selectCurrentMediaItem,
   selectOrganizationProgress,
   selectCanUndo,
-  selectCurrentSession,
-  selectHasUnsavedChanges,
-  selectSessionStats,
-  commitOrganizationSession,
-  discardOrganizationSession,
-  startOrganizationSession,
-  restoreSessionProgress,
   resetOrganization,
 } from '../store/slices/organizationSlice';
 import { useGetMediaItemsQuery } from '../store/api/googlePhotosApi';
 import { CachedMediaItem, SwipeAction } from '../types';
-import OrganizationSessionService from '../services/OrganizationSessionService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -45,17 +36,12 @@ interface OrganizationDecision {
 const OrganizeScreen: React.FC = () => {
   const dispatch = useDispatch();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showSessionExitModal, setShowSessionExitModal] = useState(false);
-  const [isCommittingSession, setIsCommittingSession] = useState(false);
   
   // Redux selectors
   const organizationState = useSelector((state: RootState) => state.organization);
   const currentMediaItem = useSelector(selectCurrentMediaItem);
   const progress = useSelector(selectOrganizationProgress);
   const canUndo = useSelector(selectCanUndo);
-  const currentSession = useSelector(selectCurrentSession);
-  const hasUnsavedChanges = useSelector(selectHasUnsavedChanges);
-  const sessionStats = useSelector(selectSessionStats);
   
   // API query
   const {
@@ -65,13 +51,6 @@ const OrganizeScreen: React.FC = () => {
     refetch: refetchMedia,
   } = useGetMediaItemsQuery({
     pageSize: 50,
-  });
-
-  // Navigation guard to prevent leaving with unsaved changes
-  useNavigationGuard({
-    hasUnsavedChanges,
-    onNavigationBlocked: () => setShowSessionExitModal(true),
-    enabled: isInitialized,
   });
 
   // Initialize screen and load saved decisions
@@ -86,49 +65,13 @@ const OrganizeScreen: React.FC = () => {
     }
   }, [organizationState.keepItems, organizationState.deleteItems, isInitialized]);
 
-  // Save session progress whenever it changes
-  useEffect(() => {
-    if (isInitialized && currentSession && !currentSession.isCommitted) {
-      const saveSessionProgress = async () => {
-        try {
-          await OrganizationSessionService.saveCurrentSession(currentSession);
-        } catch (error) {
-          console.error('Failed to save session progress:', error);
-        }
-      };
-      
-      saveSessionProgress();
-    }
-  }, [currentSession, isInitialized]);
-
   const initializeOrganization = async () => {
     try {
       // Load saved organization decisions
       const savedDecisions = await loadOrganizationDecisions();
       
-      // Check for existing session and restore if found
-      const existingSession = await OrganizationSessionService.loadCurrentSession();
-      if (existingSession && !existingSession.isCommitted && !OrganizationSessionService.isSessionExpired(existingSession)) {
-        // Show restoration message
-        Alert.alert(
-          'Session Restored',
-          `Your previous organization session has been restored. You had organized ${existingSession.processedItems} photos.`,
-          [{ text: 'Continue', style: 'default' }]
-        );
-        
-        // Restore the existing session
-        dispatch(restoreSessionProgress(existingSession));
-      } else {
-        // Clear any expired session
-        if (existingSession) {
-          await OrganizationSessionService.clearCurrentSession();
-        }
-        
-        // Start a new session in natural mode (default)
-        dispatch(startOrganizationSession({
-          startMode: 'natural',
-        }));
-      }
+      // If we have saved decisions, we could restore them here
+      // For now, we'll start fresh each time
       
       setIsInitialized(true);
     } catch (error) {
@@ -172,12 +115,10 @@ const OrganizeScreen: React.FC = () => {
 
   const handleSwipeLeft = (item: CachedMediaItem) => {
     dispatch(swipeAction({ item, action: 'delete' }));
-    // Session progress will be automatically saved via useEffect
   };
 
   const handleSwipeRight = (item: CachedMediaItem) => {
     dispatch(swipeAction({ item, action: 'keep' }));
-    // Session progress will be automatically saved via useEffect
   };
 
   const handleUndo = () => {
@@ -200,7 +141,6 @@ const OrganizeScreen: React.FC = () => {
             dispatch(resetOrganization());
             try {
               await AsyncStorage.removeItem(ORGANIZATION_STORAGE_KEY);
-              await OrganizationSessionService.clearCurrentSession();
             } catch (error) {
               console.error('Failed to clear saved decisions:', error);
             }
@@ -208,54 +148,6 @@ const OrganizeScreen: React.FC = () => {
         },
       ]
     );
-  };
-
-  // Session management functions
-  const handleCommitSession = async () => {
-    if (!currentSession) return;
-
-    setIsCommittingSession(true);
-    try {
-      // Commit the session in Redux
-      dispatch(commitOrganizationSession());
-      
-      // Save the committed session to history
-      const finalSession = {
-        ...currentSession,
-        endTime: Date.now(),
-        isCommitted: true,
-        processedItems: currentSession.pendingActions.length,
-      };
-      await OrganizationSessionService.saveToHistory(finalSession);
-      
-      // Clear current session from storage
-      await OrganizationSessionService.clearCurrentSession();
-      
-      setShowSessionExitModal(false);
-    } catch (error) {
-      console.error('Failed to commit session:', error);
-      Alert.alert('Error', 'Failed to save session. Please try again.');
-    } finally {
-      setIsCommittingSession(false);
-    }
-  };
-
-  const handleDiscardSession = async () => {
-    try {
-      // Discard the session in Redux
-      dispatch(discardOrganizationSession());
-      
-      // Clear current session from storage
-      await OrganizationSessionService.clearCurrentSession();
-      
-      setShowSessionExitModal(false);
-    } catch (error) {
-      console.error('Failed to discard session:', error);
-    }
-  };
-
-  const handleCancelExit = () => {
-    setShowSessionExitModal(false);
   };
 
   const renderProgressIndicator = () => (
@@ -271,20 +163,10 @@ const OrganizeScreen: React.FC = () => {
           ]} 
         />
       </View>
-      
-      {/* Session Statistics */}
-      {sessionStats && (
-        <View style={styles.sessionStatsContainer}>
-          <SessionStatistics
-            totalProcessed={sessionStats.processedItems}
-            keepCount={sessionStats.keepCount}
-            deleteCount={sessionStats.deleteCount}
-            sessionDuration={sessionStats.duration}
-            isCurrentSession={true}
-            compact={true}
-          />
-        </View>
-      )}
+      <Text style={styles.statsText}>
+        Keep: {organizationState.processingStats.keepCount} • 
+        Delete: {organizationState.processingStats.deleteCount}
+      </Text>
     </View>
   );
 
@@ -377,7 +259,7 @@ const OrganizeScreen: React.FC = () => {
           onUndo={handleUndo}
           canUndo={canUndo}
           undoTimeoutMs={5000}
-
+          showUndoCountdown={true}
           undoPosition="bottom"
         />
       </View>
@@ -388,23 +270,6 @@ const OrganizeScreen: React.FC = () => {
           Swipe left to delete • Swipe right to keep
         </Text>
       </View>
-
-      {/* Session Exit Modal */}
-      {sessionStats && (
-        <SessionExitModal
-          visible={showSessionExitModal}
-          isCommitting={isCommittingSession}
-          sessionStats={{
-            totalProcessed: sessionStats.processedItems,
-            keepCount: sessionStats.keepCount,
-            deleteCount: sessionStats.deleteCount,
-            sessionDuration: sessionStats.duration,
-          }}
-          onCommit={handleCommitSession}
-          onDiscard={handleDiscardSession}
-          onCancel={handleCancelExit}
-        />
-      )}
     </SafeAreaView>
   );
 };
@@ -443,9 +308,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-  },
-  sessionStatsContainer: {
-    marginTop: 12,
   },
   cardContainer: {
     flex: 1,
