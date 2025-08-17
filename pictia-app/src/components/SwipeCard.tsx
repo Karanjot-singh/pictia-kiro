@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Image,
@@ -6,13 +6,13 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-  PanResponder,
   Platform,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { CachedMediaItem, SwipeAction } from '../types';
 import { GestureConfigOptions } from './GestureConfig';
+import CardActionBar from './CardActionBar';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -20,6 +20,9 @@ interface SwipeCardProps {
   mediaItem: CachedMediaItem;
   onSwipeLeft: (item: CachedMediaItem) => void;
   onSwipeRight: (item: CachedMediaItem) => void;
+  onUndo?: () => void;
+  onCommit?: () => void;
+  showActionBar?: boolean;
   config?: Partial<GestureConfigOptions>;
   style?: any;
   undoTimeoutMs?: number;
@@ -29,6 +32,9 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   mediaItem,
   onSwipeLeft,
   onSwipeRight,
+  onUndo,
+  onCommit,
+  showActionBar = false,
   config = {},
   style,
   undoTimeoutMs = 5000,
@@ -49,22 +55,35 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   const rotate = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(1)).current;
+  const actionBarOpacity = useRef(new Animated.Value(0)).current;
 
+  const [isActionBarVisible, setIsActionBarVisible] = useState(false);
   const hasTriggeredHaptic = useRef(false);
+  const hasTriggeredThresholdHaptic = useRef(false);
 
-  const triggerHapticFeedback = (action: SwipeAction) => {
+  const triggerHapticFeedback = (action: SwipeAction, intensity: 'light' | 'medium' | 'heavy' = 'medium') => {
     if (finalConfig.enableHaptics && Platform.OS !== 'web' && !hasTriggeredHaptic.current) {
       hasTriggeredHaptic.current = true;
-      if (action === 'delete') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
+      const hapticStyle = intensity === 'light' 
+        ? Haptics.ImpactFeedbackStyle.Light
+        : intensity === 'heavy'
+        ? Haptics.ImpactFeedbackStyle.Heavy
+        : Haptics.ImpactFeedbackStyle.Medium;
+      
+      Haptics.impactAsync(hapticStyle);
     }
   };
 
-  const resetHapticFlag = () => {
+  const triggerThresholdHaptic = () => {
+    if (finalConfig.enableHaptics && Platform.OS !== 'web' && !hasTriggeredThresholdHaptic.current) {
+      hasTriggeredThresholdHaptic.current = true;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const resetHapticFlags = () => {
     hasTriggeredHaptic.current = false;
+    hasTriggeredThresholdHaptic.current = false;
   };
 
   const animateCard = (x: number, y: number) => {
@@ -78,17 +97,29 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
     rotate.setValue(rotation);
     scale.setValue(cardScale);
 
-    // Trigger haptic feedback when crossing threshold
+    // Show action bar when card is being dragged
+    const shouldShowActionBar = showActionBar && Math.abs(x) > 20;
+    if (shouldShowActionBar !== isActionBarVisible) {
+      setIsActionBarVisible(shouldShowActionBar);
+      Animated.timing(actionBarOpacity, {
+        toValue: shouldShowActionBar ? 1 : 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    // Trigger threshold haptic feedback when crossing threshold
     if (Math.abs(x) > finalConfig.swipeThreshold) {
-      const action: SwipeAction = x > 0 ? 'keep' : 'delete';
-      triggerHapticFeedback(action);
+      triggerThresholdHaptic();
     } else {
-      resetHapticFlag();
+      hasTriggeredThresholdHaptic.current = false;
     }
   };
 
   const resetCard = () => {
-    resetHapticFlag();
+    resetHapticFlags();
+    setIsActionBarVisible(false);
+    
     Animated.parallel([
       Animated.spring(translateX, {
         toValue: 0,
@@ -114,6 +145,11 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
         tension: 100,
         friction: 8,
       }),
+      Animated.timing(actionBarOpacity, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }),
     ]).start();
   };
 
@@ -121,14 +157,10 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
     const toValue = direction === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
     const action: SwipeAction = direction === 'right' ? 'keep' : 'delete';
 
-    // Final haptic feedback
-    if (finalConfig.enableHaptics && Platform.OS !== 'web') {
-      if (action === 'delete') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      }
-    }
+    // Final haptic feedback with enhanced intensity
+    triggerHapticFeedback(action, action === 'delete' ? 'heavy' : 'medium');
+
+    setIsActionBarVisible(false);
 
     Animated.parallel([
       Animated.timing(translateX, {
@@ -139,6 +171,11 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
       Animated.timing(opacity, {
         toValue: 0,
         duration: finalConfig.animationDuration,
+        useNativeDriver: true,
+      }),
+      Animated.timing(actionBarOpacity, {
+        toValue: 0,
+        duration: finalConfig.animationDuration / 2,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -236,6 +273,16 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
             {mediaItem.mediaMetadata.width} × {mediaItem.mediaMetadata.height}
           </Text>
         </View>
+
+        {/* Card Action Bar */}
+        <CardActionBar
+          visible={showActionBar && isActionBarVisible}
+          onUndo={onUndo}
+          onCommit={onCommit}
+          position="top"
+          enableHaptics={finalConfig.enableHaptics}
+          style={{ opacity: actionBarOpacity }}
+        />
       </Animated.View>
     </GestureDetector>
   );

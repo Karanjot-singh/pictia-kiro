@@ -8,6 +8,8 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+pictia-app/ios
+internal/
 
 # Native
 .kotlin/

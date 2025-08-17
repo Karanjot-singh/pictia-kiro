@@ -2,6 +2,24 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { CachedMediaItem, MediaOrganization, SwipeAction, MediaOrganizationCache } from '../../types';
 import { googlePhotosApi } from '../api/googlePhotosApi';
 
+interface OrganizationSession {
+  id: string;
+  startTime: number;
+  endTime?: number;
+  startingPhotoId?: string;
+  startMode: 'gallery' | 'natural';
+  totalItems: number;
+  processedItems: number;
+  keepCount: number;
+  deleteCount: number;
+  isCommitted: boolean;
+  pendingActions: Array<{
+    mediaItemId: string;
+    action: SwipeAction;
+    timestamp: number;
+  }>;
+}
+
 interface OrganizationState {
   currentIndex: number;
   mediaItems: CachedMediaItem[];
@@ -11,6 +29,10 @@ interface OrganizationState {
   undoAvailable: boolean;
   isLoading: boolean;
   error: string | null;
+  // Enhanced session management
+  currentSession: OrganizationSession | null;
+  sessionHistory: OrganizationSession[];
+  hasUnsavedChanges: boolean;
   // Enhanced caching and pagination
   sessionId: string;
   totalItems: number;
@@ -44,6 +66,9 @@ const initialState: OrganizationState = {
   undoAvailable: false,
   isLoading: false,
   error: null,
+  currentSession: null,
+  sessionHistory: [],
+  hasUnsavedChanges: false,
   sessionId: generateSessionId(),
   totalItems: 0,
   hasNextPage: false,
@@ -99,7 +124,7 @@ const organizationSlice = createSlice({
       state.error = action.payload;
     },
     
-    // Enhanced swipe action with undo stack
+    // Enhanced swipe action with session support
     swipeAction: (
       state,
       action: PayloadAction<{ item: CachedMediaItem; action: SwipeAction }>
@@ -126,6 +151,16 @@ const organizationSlice = createSlice({
         state.undoStack.shift();
       }
 
+      // Add to session pending actions if session exists
+      if (state.currentSession) {
+        state.currentSession.pendingActions.push({
+          mediaItemId: item.id,
+          action: swipeAction,
+          timestamp: now,
+        });
+        state.hasUnsavedChanges = true;
+      }
+
       if (swipeAction === 'keep') {
         state.keepItems.push(updatedItem);
         state.processingStats.keepCount += 1;
@@ -141,13 +176,24 @@ const organizationSlice = createSlice({
       state.lastUpdated = now;
     },
 
-    // Enhanced undo with stack support
+    // Enhanced undo with session support
     undoLastAction: state => {
       if (state.undoStack.length === 0 || !state.undoAvailable) {
         return;
       }
 
       const lastUndo = state.undoStack.pop()!;
+      
+      // Remove from session pending actions if session exists
+      if (state.currentSession) {
+        const actionIndex = state.currentSession.pendingActions.findIndex(
+          action => action.mediaItemId === lastUndo.mediaItemId
+        );
+        if (actionIndex >= 0) {
+          state.currentSession.pendingActions.splice(actionIndex, 1);
+        }
+        state.hasUnsavedChanges = state.currentSession.pendingActions.length > 0;
+      }
       
       if (state.lastAction === 'keep') {
         const removedItem = state.keepItems.pop();
@@ -254,6 +300,148 @@ const organizationSlice = createSlice({
 
       state.lastUpdated = now;
     },
+
+    // Session management actions
+    startOrganizationSession: (state, action: PayloadAction<{
+      startingPhotoId?: string;
+      startMode: 'gallery' | 'natural';
+    }>) => {
+      const { startingPhotoId, startMode } = action.payload;
+      const now = Date.now();
+
+      // Save current session if it exists and has unsaved changes
+      if (state.currentSession && state.hasUnsavedChanges) {
+        state.sessionHistory.push(state.currentSession);
+      }
+
+      // Create new session
+      state.currentSession = {
+        id: generateSessionId(),
+        startTime: now,
+        startingPhotoId: startingPhotoId || undefined,
+        startMode,
+        totalItems: state.totalItems,
+        processedItems: 0,
+        keepCount: 0,
+        deleteCount: 0,
+        isCommitted: false,
+        pendingActions: [],
+      };
+
+      // Reset organization state for new session
+      state.keepItems = [];
+      state.deleteItems = [];
+      state.undoStack = [];
+      state.hasUnsavedChanges = false;
+      state.lastAction = null;
+      state.undoAvailable = false;
+
+      // Set starting index based on mode and starting photo
+      if (startMode === 'gallery' && startingPhotoId) {
+        const startIndex = state.mediaItems.findIndex(item => item.id === startingPhotoId);
+        state.currentIndex = startIndex >= 0 ? startIndex : 0;
+      } else {
+        // Natural mode: start from oldest unreviewed photo
+        const unreviewed = state.mediaItems.filter(item => 
+          item.organizationStatus !== 'processed' && 
+          item.organizationStatus !== 'keep' && 
+          item.organizationStatus !== 'delete'
+        );
+        state.currentIndex = unreviewed.length > 0 && unreviewed[0] ? 
+          state.mediaItems.findIndex(item => item.id === unreviewed[0].id) : 0;
+      }
+
+      state.lastUpdated = now;
+    },
+
+    commitOrganizationSession: (state) => {
+      if (!state.currentSession) return;
+
+      const now = Date.now();
+      
+      // Mark all pending actions as committed
+      state.currentSession.pendingActions.forEach(action => {
+        const item = state.mediaItems.find(item => item.id === action.mediaItemId);
+        if (item) {
+          item.organizationStatus = action.action === 'keep' ? 'processed' : 'delete';
+        }
+      });
+
+      // Finalize session
+      state.currentSession.endTime = now;
+      state.currentSession.isCommitted = true;
+      state.currentSession.processedItems = state.currentSession.pendingActions.length;
+
+      // Add to history
+      state.sessionHistory.push(state.currentSession);
+
+      // Clear current session
+      state.currentSession = null;
+      state.hasUnsavedChanges = false;
+      state.undoStack = [];
+      state.lastUpdated = now;
+    },
+
+    discardOrganizationSession: (state) => {
+      if (!state.currentSession) return;
+
+      // Revert all pending actions
+      state.currentSession.pendingActions.forEach(action => {
+        const item = state.mediaItems.find(item => item.id === action.mediaItemId);
+        if (item) {
+          item.organizationStatus = 'pending';
+        }
+      });
+
+      // Clear session data
+      state.currentSession = null;
+      state.hasUnsavedChanges = false;
+      state.keepItems = [];
+      state.deleteItems = [];
+      state.undoStack = [];
+      state.lastAction = null;
+      state.undoAvailable = false;
+      state.lastUpdated = Date.now();
+    },
+
+    saveSessionProgress: (state) => {
+      if (!state.currentSession) return;
+
+      // Update session with current progress
+      state.currentSession.processedItems = state.processingStats.totalProcessed;
+      state.currentSession.keepCount = state.processingStats.keepCount;
+      state.currentSession.deleteCount = state.processingStats.deleteCount;
+      
+      // Save to localStorage or AsyncStorage would happen in middleware
+      state.lastUpdated = Date.now();
+    },
+
+    restoreSessionProgress: (state, action: PayloadAction<OrganizationSession>) => {
+      const session = action.payload;
+      
+      state.currentSession = session;
+      state.hasUnsavedChanges = session.pendingActions.length > 0;
+      
+      // Restore organization state from session
+      session.pendingActions.forEach(action => {
+        const item = state.mediaItems.find(item => item.id === action.mediaItemId);
+        if (item) {
+          const updatedItem = {
+            ...item,
+            organizationStatus: action.action,
+            lastAccessed: action.timestamp
+          } as CachedMediaItem;
+
+          if (action.action === 'keep') {
+            state.keepItems.push(updatedItem);
+          } else {
+            state.deleteItems.push(updatedItem);
+          }
+        }
+      });
+
+      state.lastUpdated = Date.now();
+    },
   },
   
   // Handle RTK Query actions
@@ -315,6 +503,11 @@ export const {
   markItemAsProcessed,
   updateItemThumbnail,
   markMultipleItems,
+  startOrganizationSession,
+  commitOrganizationSession,
+  discardOrganizationSession,
+  saveSessionProgress,
+  restoreSessionProgress,
 } = organizationSlice.actions;
 
 // Selectors
@@ -345,6 +538,39 @@ export const selectCacheStatus = (state: { organization: OrganizationState }) =>
     lastUpdated,
     age: now - lastUpdated,
   };
+};
+
+// Session selectors
+export const selectCurrentSession = (state: { organization: OrganizationState }) => 
+  state.organization.currentSession;
+
+export const selectHasUnsavedChanges = (state: { organization: OrganizationState }) => 
+  state.organization.hasUnsavedChanges;
+
+export const selectSessionHistory = (state: { organization: OrganizationState }) => 
+  state.organization.sessionHistory;
+
+export const selectSessionStats = (state: { organization: OrganizationState }) => {
+  const session = state.organization.currentSession;
+  if (!session) return null;
+  
+  return {
+    sessionId: session.id,
+    startTime: session.startTime,
+    duration: session.endTime ? session.endTime - session.startTime : Date.now() - session.startTime,
+    startMode: session.startMode,
+    totalItems: session.totalItems,
+    processedItems: session.processedItems,
+    keepCount: session.keepCount,
+    deleteCount: session.deleteCount,
+    pendingActions: session.pendingActions.length,
+    isCommitted: session.isCommitted,
+  };
+};
+
+export const selectCanCommitSession = (state: { organization: OrganizationState }) => {
+  const session = state.organization.currentSession;
+  return session && session.pendingActions.length > 0 && !session.isCommitted;
 };
 
 export default organizationSlice.reducer;

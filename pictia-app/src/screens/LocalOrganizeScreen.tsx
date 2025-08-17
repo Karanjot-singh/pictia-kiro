@@ -61,11 +61,17 @@ const LocalOrganizeScreen: React.FC = () => {
     try {
       const media = await MediaLibrary.getAssetsAsync({
         mediaType: ['photo'],
-        first: 20, // Start with fewer items for testing
+        first: 50, // Load more items for better experience
         sortBy: MediaLibrary.SortBy.creationTime,
       });
 
       console.log('Found media items:', media.assets.length);
+
+      if (media.assets.length === 0) {
+        console.log('No media items found');
+        setMediaItems([]);
+        return;
+      }
 
       // Get asset info for each item to get proper URIs
       const formattedItems: LocalMediaItem[] = [];
@@ -73,12 +79,6 @@ const LocalOrganizeScreen: React.FC = () => {
       for (const asset of media.assets) {
         try {
           const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-          console.log('Asset info:', {
-            id: asset.id,
-            filename: asset.filename,
-            uri: asset.uri,
-            localUri: assetInfo.localUri,
-          });
           
           formattedItems.push({
             id: asset.id,
@@ -108,7 +108,20 @@ const LocalOrganizeScreen: React.FC = () => {
       setMediaItems(formattedItems);
     } catch (error) {
       console.error('Error loading media items:', error);
-      Alert.alert('Error', 'Failed to load media items from your device.');
+      Alert.alert(
+        'Error Loading Photos', 
+        'Failed to load photos from your device. Please check that the app has permission to access your photos.',
+        [
+          {
+            text: 'Retry',
+            onPress: loadMediaItems,
+          },
+          {
+            text: 'OK',
+            style: 'cancel',
+          },
+        ]
+      );
     }
   };
 
@@ -320,22 +333,32 @@ const LocalOrganizeScreen: React.FC = () => {
       {/* Current photo */}
       <View style={styles.photoContainer}>
         {currentItem && (
-          <Image
-            source={{ uri: currentItem.uri }}
-            style={styles.photo}
-            resizeMode="contain"
-            onError={(error) => {
-              console.error('Image load error:', error.nativeEvent.error);
-            }}
-            onLoad={() => {
-              console.log('Image loaded successfully:', currentItem.filename);
-            }}
-          />
-        )}
-        {currentItem && (
-          <Text style={styles.photoInfo}>
-            {currentItem.filename}
-          </Text>
+          <>
+            <Image
+              source={{ uri: currentItem.uri }}
+              style={styles.photo}
+              resizeMode="contain"
+              onError={(error) => {
+                console.error('Image load error for', currentItem.filename, ':', error.nativeEvent.error);
+                Alert.alert(
+                  'Image Load Error',
+                  `Failed to load ${currentItem.filename}. Skipping to next photo.`,
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => setCurrentIndex(prev => prev + 1),
+                    },
+                  ]
+                );
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully:', currentItem.filename);
+              }}
+            />
+            <Text style={styles.photoInfo}>
+              {currentItem.filename}
+            </Text>
+          </>
         )}
       </View>
 

@@ -7,6 +7,8 @@ export { BackupService } from './BackupService';
 export { BackupScheduler } from './BackupScheduler';
 export { BackupLogger } from './BackupLogger';
 export { SettingsService } from './SettingsService';
+export { default as ReviewTracker } from './ReviewTracker';
+export { default as OrganizationSessionService } from './OrganizationSessionService';
 export type { 
   NotificationConfig, 
   BackupReminder, 

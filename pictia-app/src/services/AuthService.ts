@@ -43,16 +43,9 @@ export class GoogleAuthService implements AuthService {
   private redirectUri: string;
 
   constructor() {
-    // Get the default redirect URI
-    const defaultRedirectUri = AuthSession.makeRedirectUri();
-    
-    // If it's an exp:// URI (Expo Go), replace with HTTPS proxy
-    if (defaultRedirectUri.startsWith('exp://')) {
-      // Use Expo's auth proxy for Google OAuth compliance with your username
-      this.redirectUri = `https://auth.expo.io/@6singhk6/pictia-app`;
-    } else {
-      this.redirectUri = defaultRedirectUri;
-    }
+    // For Google OAuth with Web client type, use default redirect URI
+    // This automatically handles Expo Go vs standalone builds
+    this.redirectUri = AuthSession.makeRedirectUri();
     
     console.log('🔗 OAuth Redirect URI:', this.redirectUri);
 

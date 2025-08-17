@@ -16,10 +16,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pictia.app",
       "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to allow you to select and organize your photos.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLName": "com.pictia.app",
-            "CFBundleURLSchemes": ["com.pictia.app"]
+            "CFBundleURLSchemes": [
+              "com.pictia.app"
+            ]
           }
         ]
       }
@@ -30,6 +33,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.pictia.app",
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -39,7 +48,10 @@
               "scheme": "com.pictia.app"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "edgeToEdgeEnabled": true
@@ -49,16 +61,21 @@
     },
     "plugins": [
       "expo-secure-store",
+      "expo-task-manager",
       [
-        "expo-notifications",
+        "expo-media-library",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#ffffff",
-          "sounds": ["./assets/notification.wav"]
+          "photosPermission": "Allow Pictia to access your photos to help you organize them.",
+          "savePhotosPermission": "Allow Pictia to save photos to your library.",
+          "isAccessMediaLocationEnabled": true
         }
-      ],
-      "expo-task-manager"
+      ]
     ],
-    "scheme": "com.pictia.app"
+    "scheme": "com.pictia.app",
+    "extra": {
+      "eas": {
+        "projectId": "9ef6e40a-28fe-4ce4-a250-d6049ecd0682"
+      }
+    }
   }
 }
