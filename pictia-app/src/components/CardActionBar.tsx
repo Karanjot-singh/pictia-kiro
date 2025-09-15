@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   simpleCommitButton: {
-    backgroundColor: '#46A575',
+    backgroundColor: '#7444C0',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,

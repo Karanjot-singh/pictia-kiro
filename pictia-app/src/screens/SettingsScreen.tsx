@@ -21,7 +21,7 @@ import {
   selectFormattedStorageInfo,
   selectIsPreferencesLoaded
 } from '@/store/selectors/settingsSelectors';
-import { logoutUser } from '@/store/thunks/authThunks';
+import { logoutUser, authenticateUser } from '@/store/thunks/authThunks';
 import {
   loadPreferences,
   savePreferences,
@@ -90,13 +90,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
   }, [error, dispatch]);
 
   const handleLogout = () => {
-    const actionText = isLocalMode ? 'Exit Local Mode' : 'Sign Out';
-    const confirmText = isLocalMode ? 'Exit' : 'Sign Out';
-    
     if (hasUnsavedChanges) {
       Alert.alert(
         'Unsaved Changes',
-        `You have unsaved settings changes. Do you want to save them before ${actionText.toLowerCase()}?`,
+        'You have unsaved settings changes. Do you want to save them before signing out?',
         [
           {
             text: 'Cancel',
@@ -108,7 +105,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
             onPress: () => dispatch(logoutUser()),
           },
           {
-            text: `Save & ${confirmText}`,
+            text: 'Save & Sign Out',
             onPress: async () => {
               if (preferences) {
                 await dispatch(savePreferences(preferences));
@@ -120,19 +117,36 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       );
     } else {
       Alert.alert(
-        actionText,
-        `Are you sure you want to ${actionText.toLowerCase()}?`,
+        'Sign Out',
+        'Are you sure you want to sign out?',
         [
           {
             text: 'Cancel',
             style: 'cancel',
           },
           {
-            text: confirmText,
+            text: 'Sign Out',
             style: 'destructive',
             onPress: () => dispatch(logoutUser()),
           },
         ]
+      );
+    }
+  };
+
+  const handleConnectGoogle = async () => {
+    try {
+      await dispatch(authenticateUser()).unwrap();
+      Alert.alert(
+        'Connected Successfully',
+        'Your Google Photos account has been connected successfully!',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert(
+        'Connection Failed',
+        'Failed to connect to Google Photos. Please try again.',
+        [{ text: 'OK' }]
       );
     }
   };
@@ -223,36 +237,45 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
     },
   ].filter(option => !isLocalMode || option.showInLocalMode);
 
-  const renderUserProfile = () => (
-    <View style={styles.profileSection}>
-      <View style={styles.profileInfo}>
-        <Text style={styles.profileName}>
-          {isLocalMode ? 'Local Gallery Mode' : (userProfile?.name || 'User')}
-        </Text>
-        <Text style={styles.profileEmail}>
-          {isLocalMode ? 'Using device gallery only' : (userProfile?.email || 'No email available')}
-        </Text>
-        {!isLocalMode && userProfile?.quotaUsed !== undefined && userProfile?.quotaLimit !== undefined && (
-          <Text style={styles.profileQuota}>
-            Storage: {formatFileSize(userProfile.quotaUsed)} / {formatFileSize(userProfile.quotaLimit)}
+  const renderUserProfile = () => {
+    if (isLocalMode) {
+      return (
+        <View style={styles.profileSection}>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>Local Gallery Mode</Text>
+            <Text style={styles.profileEmail}>Using device gallery only</Text>
+            <Text style={styles.profileQuota}>
+              No Google Photos integration
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.profileSection}>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>
+            {userProfile?.name || 'User'}
           </Text>
-        )}
-        {isLocalMode && (
-          <Text style={styles.profileQuota}>
-            No Google Photos integration
+          <Text style={styles.profileEmail}>
+            {userProfile?.email || 'No email available'}
           </Text>
-        )}
+          {userProfile?.quotaUsed !== undefined && userProfile?.quotaLimit !== undefined && (
+            <Text style={styles.profileQuota}>
+              Storage: {formatFileSize(userProfile.quotaUsed)} / {formatFileSize(userProfile.quotaLimit)}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutButtonText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={handleLogout}
-      >
-        <Text style={styles.logoutButtonText}>
-          {isLocalMode ? 'Exit Local Mode' : 'Sign Out'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderGooglePhotosSection = () => {
     if (isLocalMode) {
@@ -262,18 +285,14 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.connectButton}
             onPress={() => {
-              // Handle Google Photos connection
               Alert.alert(
                 'Connect Google Photos',
-                'This will connect your Google Photos account and exit local mode.',
+                'This will connect your Google Photos account and enable cloud features like backup and sync.',
                 [
                   { text: 'Cancel', style: 'cancel' },
                   { 
                     text: 'Connect', 
-                    onPress: () => {
-                      // TODO: Implement Google Photos connection
-                      console.log('Connect Google Photos');
-                    }
+                    onPress: handleConnectGoogle
                   }
                 ]
               );
@@ -281,7 +300,7 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
           >
             <View style={styles.connectButtonContent}>
               <View style={styles.connectIcon}>
-                <Text style={styles.connectIconText}>📷</Text>
+                <Text style={styles.connectIconText}>G</Text>
               </View>
               <View style={styles.connectTextContent}>
                 <Text style={styles.connectButtonTitle}>Connect Google Photos</Text>
@@ -876,6 +895,14 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f8f9fa',
+    borderRadius: 8,
+    marginHorizontal: 20,
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   connectButtonContent: {
     flexDirection: 'row',
@@ -885,13 +912,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#7444C0',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
   connectIconText: {
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
   },
   connectTextContent: {
     flex: 1,
@@ -899,7 +928,7 @@ const styles = StyleSheet.create({
   connectButtonTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#007bff',
+    color: '#7444C0',
     marginBottom: 2,
   },
   connectButtonDescription: {

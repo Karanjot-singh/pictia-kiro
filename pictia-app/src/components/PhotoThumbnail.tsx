@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: THEME_COLORS.SUCCESS, // Use theme success color
+    backgroundColor: 'rgba(116, 68, 192, 0.8)', // Primary color with transparency for reviewed photos
     justifyContent: 'center',
     alignItems: 'center',
     ...SHADOWS.THUMBNAIL, // Add subtle shadow to review badge

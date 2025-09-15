@@ -563,7 +563,7 @@ const OrganizeScreen: React.FC = () => {
     if (isLoading) {
       return (
         <View style={styles.completionContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#7444C0" />
           <Text style={styles.completionTitle}>
             {status === 'checking_more' ? 'Checking for more photos...' : 'Loading more photos...'}
           </Text>
@@ -627,7 +627,7 @@ const OrganizeScreen: React.FC = () => {
 
   const renderLoadingScreen = () => (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#007AFF" />
+      <ActivityIndicator size="large" color="#7444C0" />
       <Text style={styles.loadingText}>Loading photos...</Text>
     </View>
   );
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#7444C0',
     borderRadius: 2,
   },
   statsText: {
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: '#7444C0',
     textAlign: 'center',
     textDecorationLine: 'underline',
   },
@@ -871,7 +871,7 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
   },
   loadMoreButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#7444C0',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

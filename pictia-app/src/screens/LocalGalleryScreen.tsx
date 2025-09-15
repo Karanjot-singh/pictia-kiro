@@ -426,7 +426,7 @@ const LocalGalleryScreen: React.FC = () => {
   // Render loading screen
   const renderLoadingScreen = () => (
     <View style={styles.centerContainer}>
-      <ActivityIndicator size="large" color="#007AFF" />
+      <ActivityIndicator size="large" color="#7444C0" />
       <Text style={styles.loadingText}>Loading your photos...</Text>
     </View>
   );
@@ -478,7 +478,7 @@ const LocalGalleryScreen: React.FC = () => {
           style={styles.headerButton}
           onPress={() => navigation.navigate('SwipeMode', { startMode: 'natural' })}
         >
-          <Ionicons name="albums" size={24} color="#007AFF" />
+          <Ionicons name="albums" size={24} color="#7444C0" />
           <Text style={styles.headerButtonText}>Organize</Text>
         </TouchableOpacity>
       </View>
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   headerButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#7444C0',
     marginLeft: 6,
   },
   title: {
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#7444C0',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
   },
   selectedThumbnail: {
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: '#7444C0',
   },
   thumbnail: {
     borderRadius: 4,
@@ -683,8 +683,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#7444C0',
+    borderColor: '#7444C0',
   },
   reviewIndicator: {
     position: 'absolute',

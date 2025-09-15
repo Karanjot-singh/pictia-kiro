@@ -281,7 +281,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#7444C0" />
           <Text style={styles.loadingText}>Loading photos...</Text>
         </View>
       </SafeAreaView>

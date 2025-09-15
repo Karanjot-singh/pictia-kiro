@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   simpleCommitButton: {
-    backgroundColor: '#46A575',
+    backgroundColor: '#7444C0',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
   sessionStatNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#333',
+    color: '#7444C0',
     marginBottom: 2,
   },
   sessionStatLabel: {
@@ -757,10 +757,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   keepColor: {
-    color: '#34C759',
+    color: '#7444C0',
   },
   deleteColor: {
-    color: '#FF3B30',
+    color: '#7444C0',
   },
 
   stats: {

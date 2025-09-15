@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   controlButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#7444C0',
     borderRadius: 20,
     padding: 8,
     minWidth: 40,
