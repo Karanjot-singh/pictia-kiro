@@ -1,46 +1,59 @@
-import React, { useEffect, useState, useRef } from 'react';
+/**
+ * Modern permission request dialog component
+ * Provides a consistent, attractive interface for requesting various permissions
+ */
+
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Modal,
   Animated,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import {
-  selectNotificationPermissions,
-  selectNotificationLoading,
-} from '@/store/selectors/notificationSelectors';
-import {
-  requestNotificationPermissions,
-  clearError,
-} from '@/store/slices/notificationSlice';
 import { THEME_COLORS, SPACING, TEXT_STYLES, SHADOWS, BORDER_RADIUS } from '@/theme';
 
-interface NotificationPermissionRequestProps {
+interface PermissionBenefit {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+interface PermissionRequestDialogProps {
   visible: boolean;
   onClose: () => void;
-  onPermissionGranted?: () => void;
-  onPermissionDenied?: () => void;
+  onAllow: () => void;
+  onDeny: () => void;
+  title: string;
+  description: string;
+  icon: string;
+  benefits: PermissionBenefit[];
+  allowButtonText?: string;
+  denyButtonText?: string;
+  isLoading?: boolean;
+  gradientColors?: readonly [string, string];
 }
 
 const { width } = Dimensions.get('window');
 
-const NotificationPermissionRequest: React.FC<NotificationPermissionRequestProps> = ({
+const PermissionRequestDialog: React.FC<PermissionRequestDialogProps> = ({
   visible,
   onClose,
-  onPermissionGranted,
-  onPermissionDenied,
+  onAllow,
+  onDeny,
+  title,
+  description,
+  icon,
+  benefits,
+  allowButtonText = 'Allow',
+  denyButtonText = 'Not Now',
+  isLoading = false,
+  gradientColors = THEME_COLORS.PRIMARY_GRADIENT,
 }) => {
-  const dispatch = useAppDispatch();
-  const permissions = useAppSelector(selectNotificationPermissions);
-  const isLoading = useAppSelector(selectNotificationLoading);
-  const [hasRequested, setHasRequested] = useState(false);
-
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -75,33 +88,16 @@ const NotificationPermissionRequest: React.FC<NotificationPermissionRequestProps
     }
   }, [visible]);
 
-  useEffect(() => {
-    if (permissions && hasRequested) {
-      if (permissions.granted) {
-        onPermissionGranted?.();
-      } else {
-        onPermissionDenied?.();
-      }
-      setHasRequested(false);
-    }
-  }, [permissions, hasRequested, onPermissionGranted, onPermissionDenied]);
-
-  const handleRequestPermission = async () => {
-    try {
-      setHasRequested(true);
-      await dispatch(requestNotificationPermissions()).unwrap();
-    } catch (error) {
-      setHasRequested(false);
-      Alert.alert(
-        'Permission Error',
-        'Failed to request notification permissions. Please try again.',
-        [{ text: 'OK', onPress: () => dispatch(clearError()) }]
-      );
+  const handleAllow = () => {
+    if (!isLoading) {
+      onAllow();
     }
   };
 
-  const handleSkip = () => {
-    onClose();
+  const handleDeny = () => {
+    if (!isLoading) {
+      onDeny();
+    }
   };
 
   return (
@@ -130,88 +126,68 @@ const NotificationPermissionRequest: React.FC<NotificationPermissionRequestProps
         >
           {/* Header with gradient background */}
           <LinearGradient
-            colors={THEME_COLORS.PRIMARY_GRADIENT}
+            colors={gradientColors}
             style={styles.header}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.iconContainer}>
-              <Text style={styles.icon}>🔔</Text>
+              <Text style={styles.icon}>{icon}</Text>
             </View>
-            <Text style={styles.title}>Enable Notifications</Text>
-            <Text style={styles.headerDescription}>
-              Stay on top of your photo organization
-            </Text>
+            <Text style={styles.title}>{title}</Text>
           </LinearGradient>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.description}>
-              Get reminded before your scheduled backups so you never miss organizing your photos.
-            </Text>
+            <Text style={styles.description}>{description}</Text>
             
-            <View style={styles.benefits}>
-              <View style={styles.benefitItem}>
-                <View style={styles.benefitIconContainer}>
-                  <Text style={styles.benefitIcon}>⏰</Text>
-                </View>
-                <View style={styles.benefitTextContainer}>
-                  <Text style={styles.benefitTitle}>Timely Reminders</Text>
-                  <Text style={styles.benefitSubtext}>Never miss a backup schedule</Text>
-                </View>
+            {benefits.length > 0 && (
+              <View style={styles.benefits}>
+                {benefits.map((benefit, index) => (
+                  <View key={index} style={styles.benefitItem}>
+                    <View style={styles.benefitIconContainer}>
+                      <Text style={styles.benefitIcon}>{benefit.icon}</Text>
+                    </View>
+                    <View style={styles.benefitTextContainer}>
+                      <Text style={styles.benefitTitle}>{benefit.title}</Text>
+                      <Text style={styles.benefitSubtext}>{benefit.description}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
-              
-              <View style={styles.benefitItem}>
-                <View style={styles.benefitIconContainer}>
-                  <Text style={styles.benefitIcon}>📱</Text>
-                </View>
-                <View style={styles.benefitTextContainer}>
-                  <Text style={styles.benefitTitle}>Customizable</Text>
-                  <Text style={styles.benefitSubtext}>Set your preferred timing</Text>
-                </View>
-              </View>
-              
-              <View style={styles.benefitItem}>
-                <View style={styles.benefitIconContainer}>
-                  <Text style={styles.benefitIcon}>🎯</Text>
-                </View>
-                <View style={styles.benefitTextContainer}>
-                  <Text style={styles.benefitTitle}>Stay Organized</Text>
-                  <Text style={styles.benefitSubtext}>Keep your photos tidy</Text>
-                </View>
-              </View>
-            </View>
+            )}
             
             <View style={styles.buttons}>
               <TouchableOpacity
                 style={[styles.primaryButton, isLoading && styles.disabledButton]}
-                onPress={handleRequestPermission}
+                onPress={handleAllow}
                 disabled={isLoading}
               >
                 <LinearGradient
-                  colors={THEME_COLORS.PRIMARY_GRADIENT}
+                  colors={gradientColors}
                   style={styles.buttonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <Text style={styles.primaryButtonText}>
-                    {isLoading ? 'Requesting...' : 'Enable Notifications'}
-                  </Text>
+                  {isLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="small" color={THEME_COLORS.WHITE} />
+                      <Text style={styles.loadingText}>Processing...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.primaryButtonText}>{allowButtonText}</Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={styles.secondaryButton}
-                onPress={handleSkip}
+                onPress={handleDeny}
                 disabled={isLoading}
               >
-                <Text style={styles.secondaryButtonText}>Maybe Later</Text>
+                <Text style={styles.secondaryButtonText}>{denyButtonText}</Text>
               </TouchableOpacity>
             </View>
-            
-            <Text style={styles.disclaimer}>
-              You can change this setting anytime in the app settings.
-            </Text>
           </View>
         </Animated.View>
       </Animated.View>
@@ -262,14 +238,6 @@ const styles = StyleSheet.create({
   title: {
     ...TEXT_STYLES.heading2,
     color: THEME_COLORS.WHITE,
-    marginBottom: SPACING.SM,
-    textAlign: 'center',
-  },
-
-  headerDescription: {
-    ...TEXT_STYLES.bodyMedium,
-    color: THEME_COLORS.WHITE,
-    opacity: 0.9,
     textAlign: 'center',
   },
 
@@ -327,7 +295,7 @@ const styles = StyleSheet.create({
   },
 
   buttons: {
-    marginBottom: SPACING.MD,
+    marginBottom: SPACING.SM,
   },
 
   primaryButton: {
@@ -351,6 +319,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingText: {
+    ...TEXT_STYLES.buttonText,
+    color: THEME_COLORS.WHITE,
+    marginLeft: SPACING.SM,
+  },
+
   secondaryButton: {
     paddingVertical: SPACING.MD,
     alignItems: 'center',
@@ -366,14 +346,6 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
-
-  disclaimer: {
-    ...TEXT_STYLES.caption,
-    color: THEME_COLORS.TEXT_SECONDARY,
-    textAlign: 'center',
-    lineHeight: 16,
-    opacity: 0.8,
-  },
 });
 
-export default NotificationPermissionRequest;
+export default PermissionRequestDialog;

@@ -1,12 +1,11 @@
 import React, { useRef, useEffect } from 'react';
 import {
   View,
-  TouchableOpacity,
   StyleSheet,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import ModernActionButton from './ModernActionButton';
+import { SPACING } from '@/theme/spacing';
 
 interface CardActionBarProps {
   visible: boolean;
@@ -61,16 +60,10 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
   }, [visible]);
 
   const handleUndo = () => {
-    if (enableHaptics) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
     onUndo?.();
   };
 
   const handleCommit = () => {
-    if (enableHaptics) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
     onCommit?.();
   };
 
@@ -94,32 +87,24 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
     >
       <View style={styles.actionBar} testID="card-action-bar">
         {onUndo && (
-          <TouchableOpacity
-            testID="undo-button"
-            style={[styles.actionButton, styles.undoButton]}
+          <ModernActionButton
+            variant="undo"
+            size="medium"
             onPress={handleUndo}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Undo last action"
-          >
-            <Ionicons name="arrow-undo" size={24} color="#fff" />
-          </TouchableOpacity>
+            enableHaptics={enableHaptics}
+          />
         )}
         
         {/* Spacer to push commit button to the right */}
         {!onUndo && <View style={styles.spacer} />}
         
         {onCommit && (
-          <TouchableOpacity
-            testID="commit-button"
-            style={[styles.actionButton, styles.commitButton]}
+          <ModernActionButton
+            variant="commit"
+            size="medium"
             onPress={handleCommit}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Commit session changes"
-          >
-            <Ionicons name="checkmark-done" size={24} color="#fff" />
-          </TouchableOpacity>
+            enableHaptics={enableHaptics}
+          />
         )}
       </View>
     </Animated.View>
@@ -144,29 +129,8 @@ const styles = StyleSheet.create({
   actionBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.MD,
     alignItems: 'center',
-  },
-  actionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  undoButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  commitButton: {
-    backgroundColor: 'rgba(52, 199, 89, 0.9)',
   },
   spacer: {
     flex: 1,

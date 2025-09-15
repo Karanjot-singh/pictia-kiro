@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CachedMediaItem } from '@/types';
+import { THEME_COLORS } from '@/theme/colors';
+import { SHADOWS } from '@/theme/shadows';
+import { BORDER_RADIUS } from '@/theme/spacing';
 
 interface PhotoThumbnailProps {
   mediaItem: CachedMediaItem;
@@ -114,16 +117,17 @@ const formatDuration = (videoMetadata: any): string => {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.THUMBNAIL,
     overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: THEME_COLORS.LIGHT_GRAY,
+    ...SHADOWS.THUMBNAIL, // Add subtle shadow for modern card-like appearance
   },
   selectedContainer: {
     borderWidth: 3,
-    borderColor: '#007AFF',
+    borderColor: THEME_COLORS.PRIMARY, // Use primary color for consistency
   },
   image: {
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.THUMBNAIL,
   },
   selectedImage: {
     opacity: 0.8,
@@ -150,14 +154,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: THEME_COLORS.WHITE,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: THEME_COLORS.PRIMARY, // Use primary color for consistency
+    borderColor: THEME_COLORS.PRIMARY,
   },
   reviewIndicator: {
     position: 'absolute',
@@ -168,17 +172,10 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#34C759',
+    backgroundColor: THEME_COLORS.SUCCESS, // Use theme success color
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
+    ...SHADOWS.THUMBNAIL, // Add subtle shadow to review badge
   },
   selectionOverlay: {
     position: 'absolute',
@@ -186,8 +183,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 122, 255, 0.2)',
-    borderRadius: 4,
+    backgroundColor: `${THEME_COLORS.PRIMARY}30`, // Use primary color with transparency
+    borderRadius: BORDER_RADIUS.THUMBNAIL,
   },
   durationContainer: {
     position: 'absolute',
@@ -196,10 +193,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     paddingHorizontal: 4,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.SM,
   },
   durationText: {
-    color: 'white',
+    color: THEME_COLORS.WHITE,
     fontSize: 10,
     fontWeight: '600',
   },

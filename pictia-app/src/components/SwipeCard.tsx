@@ -13,6 +13,7 @@ import { runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { CachedMediaItem, SwipeAction } from '../types';
 import { GestureConfigOptions } from './GestureConfig';
+import { THEME_COLORS, SHADOWS, BORDER_RADIUS, SPACING } from '../theme';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -282,17 +283,12 @@ const styles = StyleSheet.create({
   card: {
     width: screenWidth * 0.9,
     height: screenHeight * 0.6,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
+    backgroundColor: THEME_COLORS.WHITE,
+    borderRadius: BORDER_RADIUS.CARD, // Using theme border radius (16)
+    ...SHADOWS.CARD, // Using theme shadow system
     overflow: 'hidden',
+    // Enhanced modern styling
+    marginHorizontal: SPACING.MD,
   },
   image: {
     width: '100%',
@@ -306,13 +302,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: BORDER_RADIUS.CARD, // Match card border radius
   },
   deleteOverlay: {
-    backgroundColor: 'rgba(255, 59, 48, 0.85)',
+    backgroundColor: `${THEME_COLORS.DANGER}D9`, // Using theme danger color with 85% opacity
   },
   keepOverlay: {
-    backgroundColor: 'rgba(52, 199, 89, 0.85)',
+    backgroundColor: `${THEME_COLORS.SUCCESS}D9`, // Using theme success color with 85% opacity
   },
   overlayContent: {
     alignItems: 'center',
@@ -321,23 +317,23 @@ const styles = StyleSheet.create({
   overlayIcon: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: BORDER_RADIUS.CIRCLE,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.MD,
     borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.8)',
   },
   overlayIconText: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#fff',
+    color: THEME_COLORS.WHITE,
   },
   overlayText: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#fff',
+    color: THEME_COLORS.WHITE,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -349,10 +345,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 16,
+    padding: SPACING.MD,
+    borderBottomLeftRadius: BORDER_RADIUS.CARD,
+    borderBottomRightRadius: BORDER_RADIUS.CARD,
   },
   filename: {
-    color: '#fff',
+    color: THEME_COLORS.WHITE,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,

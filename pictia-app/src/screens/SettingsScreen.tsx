@@ -198,13 +198,6 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       showInLocalMode: false, // Hide in local mode since no Google Photos backup
     },
     {
-      title: 'Backup Settings',
-      description: 'Configure automatic backup schedules',
-      onPress: () => setShowBackupSettings(true),
-      icon: '☁️',
-      showInLocalMode: false, // Hide in local mode since no Google Photos backup
-    },
-    {
       title: 'Advanced Settings',
       description: 'Performance, storage, and developer options',
       onPress: () => setShowAdvancedSettings(true),
@@ -257,6 +250,76 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
         <Text style={styles.logoutButtonText}>
           {isLocalMode ? 'Exit Local Mode' : 'Sign Out'}
         </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderGooglePhotosSection = () => {
+    if (isLocalMode) {
+      return (
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Google Photos</Text>
+          <TouchableOpacity
+            style={styles.connectButton}
+            onPress={() => {
+              // Handle Google Photos connection
+              Alert.alert(
+                'Connect Google Photos',
+                'This will connect your Google Photos account and exit local mode.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: 'Connect', 
+                    onPress: () => {
+                      // TODO: Implement Google Photos connection
+                      console.log('Connect Google Photos');
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <View style={styles.connectButtonContent}>
+              <View style={styles.connectIcon}>
+                <Text style={styles.connectIconText}>📷</Text>
+              </View>
+              <View style={styles.connectTextContent}>
+                <Text style={styles.connectButtonTitle}>Connect Google Photos</Text>
+                <Text style={styles.connectButtonDescription}>
+                  Access your Google Photos library for organization and backup
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return null;
+  };
+
+  const renderBackupSection = () => (
+    <View style={styles.settingsSection}>
+      <Text style={styles.sectionTitle}>Backup & Sync</Text>
+      <TouchableOpacity
+        style={[styles.settingOption, isLocalMode && styles.disabledOption]}
+        onPress={isLocalMode ? undefined : () => navigation.navigate('BackupSettings')}
+        disabled={isLocalMode}
+      >
+        <View style={styles.settingIcon}>
+          <Text style={styles.settingIconText}>☁️</Text>
+        </View>
+        <View style={styles.settingContent}>
+          <Text style={[styles.settingTitle, isLocalMode && styles.disabledText]}>
+            Backup Settings
+          </Text>
+          <Text style={[styles.settingDescription, isLocalMode && styles.disabledText]}>
+            {isLocalMode 
+              ? 'Connect Google Photos to enable backup features'
+              : 'Configure automatic backup schedules and preferences'
+            }
+          </Text>
+        </View>
+        <Text style={[styles.settingChevron, isLocalMode && styles.disabledText]}>›</Text>
       </TouchableOpacity>
     </View>
   );
@@ -489,6 +552,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {renderUserProfile()}
+        
+        {renderGooglePhotosSection()}
+        
+        {renderBackupSection()}
         
         {renderPreferencesSection()}
         
@@ -802,6 +869,49 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  connectButton: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8f9fa',
+  },
+  connectButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  connectIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e3f2fd',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  connectIconText: {
+    fontSize: 20,
+  },
+  connectTextContent: {
+    flex: 1,
+  },
+  connectButtonTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#007bff',
+    marginBottom: 2,
+  },
+  connectButtonDescription: {
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 18,
+  },
+  disabledOption: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: '#adb5bd',
   },
 });
 

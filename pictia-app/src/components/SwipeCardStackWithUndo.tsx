@@ -6,6 +6,7 @@ import {
 import SwipeCardStack from './SwipeCardStack';
 import CardActionBar from './CardActionBar';
 import { CachedMediaItem } from '../types';
+import { THEME_COLORS } from '../theme';
 
 interface SwipeCardStackWithUndoProps {
   mediaItems: CachedMediaItem[];
@@ -138,6 +139,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: 'relative',
+    backgroundColor: THEME_COLORS.BACKGROUND_PRIMARY, // Use theme background
   },
 });
 

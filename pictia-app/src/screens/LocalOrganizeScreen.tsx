@@ -13,7 +13,7 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
-import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '@/components';
+import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics, ModernActionButton } from '@/components';
 import { CachedMediaItem } from '@/types';
 import ReviewTracker from '@/services/ReviewTracker';
 
@@ -412,12 +412,15 @@ const LocalOrganizeScreen: React.FC = () => {
       </Text>
       
       {deleteCount > 0 && (
-        <TouchableOpacity
-          style={[styles.button, styles.deleteButton]}
-          onPress={handleCommitSession}
-        >
-          <Text style={styles.buttonText}>Delete Marked Items</Text>
-        </TouchableOpacity>
+        <View style={styles.modernButtonContainer}>
+          <ModernActionButton
+            variant="delete"
+            size="large"
+            onPress={handleCommitSession}
+            enableHaptics={true}
+          />
+          <Text style={styles.modernButtonLabel}>Delete Marked Items</Text>
+        </View>
       )}
       
       <TouchableOpacity
@@ -495,21 +498,19 @@ const LocalOrganizeScreen: React.FC = () => {
       {(canUndo || true) && (
         <View style={styles.actionButtonsContainer}>
           {canUndo && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.undoButton]}
+            <ModernActionButton
+              variant="undo"
+              size="medium"
               onPress={handleUndo}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.actionButtonIcon}>↶</Text>
-            </TouchableOpacity>
+              enableHaptics={true}
+            />
           )}
-          <TouchableOpacity
-            style={[styles.actionButton, styles.commitButton]}
+          <ModernActionButton
+            variant="commit"
+            size="medium"
             onPress={handleCommitSession}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.actionButtonIcon}>✓</Text>
-          </TouchableOpacity>
+            enableHaptics={true}
+          />
         </View>
       )}
 
@@ -601,6 +602,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     marginVertical: 8,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
   },
   buttonText: {
     color: '#fff',
@@ -707,6 +711,17 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  modernButtonContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  modernButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

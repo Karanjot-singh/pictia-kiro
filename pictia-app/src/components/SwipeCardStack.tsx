@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import SwipeCard from './SwipeCard';
 import { CachedMediaItem, SwipeAction } from '../types';
+import { SPACING } from '../theme';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -191,6 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    paddingHorizontal: SPACING.MD, // Add consistent padding
   },
   cardContainer: {
     position: 'absolute',

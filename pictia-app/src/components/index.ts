@@ -24,3 +24,50 @@ export { default as BatchActionBar } from './BatchActionBar';
 // Session management components
 export { default as SessionExitModal } from './SessionExitModal';
 export { default as SessionStatistics } from './SessionStatistics';
+
+// Modern UI components
+export { default as ModernActionButton } from './ModernActionButton';
+export { default as SwipeActionButtons } from './SwipeActionButtons';
+export { default as ModernTabBar } from './ModernTabBar';
+export { default as SplashScreen } from './SplashScreen';
+export { default as PermissionRequestDialog } from './PermissionRequestDialog';
+export { default as MediaPermissionRequest } from './MediaPermissionRequest';
+
+// Loading states and animations
+export {
+  LoadingSpinner,
+  Skeleton,
+  Shimmer,
+  PhotoGridSkeleton,
+  CardSkeleton,
+  ProgressIndicator,
+} from './LoadingStates';
+export {
+  LoadingScreen,
+  InlineLoading,
+  LoadingOverlay,
+} from './LoadingScreen';
+
+// Empty states
+export {
+  EmptyState,
+  PhotosEmptyState,
+  GalleryEmptyState,
+  SearchEmptyState,
+  BackupEmptyState,
+  OrganizeEmptyState,
+  CompactEmptyState,
+} from './EmptyStates';
+
+// Error states
+export {
+  NetworkError,
+  AuthError,
+  PermissionError,
+  UploadError,
+  BackupError,
+  SyncError,
+  ApiError,
+  ErrorBoundaryFallback,
+  ErrorToast,
+} from './ErrorStates';

@@ -4,6 +4,7 @@ export { default as OrganizeDirectScreen } from './OrganizeDirectScreen';
 export { default as GalleryScreen } from './GalleryScreen';
 export { default as OrganiseScreen } from './OrganiseScreen';
 export { default as SettingsScreen } from './SettingsScreen';
+export { default as BackupSettingsScreen } from './BackupSettingsScreen';
 export { default as LocalOrganizeScreen } from './LocalOrganizeScreen';
 export { default as LocalGalleryScreen } from './LocalGalleryScreen';
 export { UploadScreen } from './UploadScreen';

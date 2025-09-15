@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
 import { MainTabParamList } from '@/types';
-import { SettingsScreen, DebugScreen } from '@/screens';
+import { SettingsScreen, DebugScreen, BackupSettingsScreen } from '@/screens';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
+import { ModernTabBar } from '@/components';
 
 // Import the new combined organise screen
 import OrganiseScreen from '@/screens/OrganiseScreen';
@@ -34,30 +34,10 @@ const TabNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          if (route.name === 'Organise') {
-            iconName = focused ? 'albums' : 'albums-outline';
-          } else if (route.name === 'Organize') {
-            iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline';
-          } else if (route.name === 'Backup') {
-            iconName = focused ? 'cloud-upload' : 'cloud-upload-outline';
-          } else if (route.name === 'Upload') {
-            iconName = focused ? 'add-circle' : 'add-circle-outline';
-          } else if (route.name === 'Settings') {
-            iconName = focused ? 'settings' : 'settings-outline';
-          } else {
-            iconName = 'help-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+      tabBar={(props) => <ModernTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-      })}
+      }}
     >
       <Tab.Screen 
         name="Organise" 
@@ -89,6 +69,13 @@ const MainNavigator: React.FC = () => {
         component={DebugScreen}
         options={{
           presentation: 'modal',
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen 
+        name="BackupSettings" 
+        component={BackupSettingsScreen}
+        options={{
           headerShown: false,
         }}
       />

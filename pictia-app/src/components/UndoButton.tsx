@@ -8,6 +8,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { THEME_COLORS } from '@/theme/colors';
+import { SHADOWS } from '@/theme/shadows';
+import { SPACING, BORDER_RADIUS } from '@/theme/spacing';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -148,25 +152,32 @@ const UndoButton: React.FC<UndoButtonProps> = ({
         onPress={handleUndo}
         activeOpacity={0.8}
       >
-        <View style={styles.content}>
-          <Ionicons name="arrow-undo" size={20} color="#fff" />
-          <Text style={styles.buttonText}>Undo</Text>
-          {showCountdown && (
-            <Text style={styles.countdownText}>
-              {getSecondsLeft()}s
-            </Text>
-          )}
-        </View>
-        
-        {/* Progress bar */}
-        <View style={styles.progressContainer}>
-          <Animated.View
-            style={[
-              styles.progressBar,
-              { width: getProgressWidth() },
-            ]}
-          />
-        </View>
+        <LinearGradient
+          colors={['rgba(0, 0, 0, 0.8)', 'rgba(0, 0, 0, 0.9)'] as const}
+          style={styles.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.content}>
+            <Ionicons name="arrow-undo-outline" size={18} color={THEME_COLORS.WHITE} />
+            <Text style={styles.buttonText}>Undo</Text>
+            {showCountdown && (
+              <Text style={styles.countdownText}>
+                {getSecondsLeft()}s
+              </Text>
+            )}
+          </View>
+          
+          {/* Progress bar */}
+          <View style={styles.progressContainer}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                { width: getProgressWidth() },
+              ]}
+            />
+          </View>
+        </LinearGradient>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -190,20 +201,15 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   button: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 25,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    borderRadius: BORDER_RADIUS.XL,
     minWidth: 120,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...SHADOWS.BUTTON,
     overflow: 'hidden',
+  },
+  gradient: {
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
+    borderRadius: BORDER_RADIUS.XL,
   },
   content: {
     flexDirection: 'row',
@@ -211,14 +217,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: THEME_COLORS.WHITE,
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
-    marginRight: 8,
+    marginLeft: SPACING.SM,
+    marginRight: SPACING.SM,
   },
   countdownText: {
-    color: '#ccc',
+    color: THEME_COLORS.GRAY,
     fontSize: 14,
     fontWeight: '500',
     minWidth: 25,
@@ -234,7 +240,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME_COLORS.PRIMARY,
   },
 });
 
