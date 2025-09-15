@@ -7,8 +7,9 @@ import { SettingsScreen } from '@/screens';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
 
-// Import organize screens
-import { OrganizeScreen, LocalOrganizeScreen } from '@/screens';
+// Import the new combined organise screen
+import OrganiseScreen from '@/screens/OrganiseScreen';
+import OrganizeDirectScreen from '@/screens/OrganizeDirectScreen';
 
 const BackupScreen: React.FC = () => (
   <View style={styles.placeholderContainer}>
@@ -29,17 +30,16 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const MainNavigator: React.FC = () => {
   const isLocalMode = useAppSelector(selectIsLocalMode);
 
-  // Choose the appropriate organize screen based on mode
-  const OrganizeComponent = isLocalMode ? LocalOrganizeScreen : OrganizeScreen;
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
-          if (route.name === 'Organize') {
+          if (route.name === 'Organise') {
             iconName = focused ? 'albums' : 'albums-outline';
+          } else if (route.name === 'Organize') {
+            iconName = focused ? 'swap-horizontal' : 'swap-horizontal-outline';
           } else if (route.name === 'Backup') {
             iconName = focused ? 'cloud-upload' : 'cloud-upload-outline';
           } else if (route.name === 'Upload') {
@@ -58,10 +58,17 @@ const MainNavigator: React.FC = () => {
       })}
     >
       <Tab.Screen 
-        name="Organize" 
-        component={OrganizeComponent}
+        name="Organise" 
+        component={OrganiseScreen}
         options={{
-          tabBarLabel: isLocalMode ? 'Local Gallery' : 'Organize',
+          tabBarLabel: 'Gallery',
+        }}
+      />
+      <Tab.Screen 
+        name="Organize" 
+        component={OrganizeDirectScreen}
+        options={{
+          tabBarLabel: 'Organize',
         }}
       />
       {!isLocalMode && <Tab.Screen name="Backup" component={BackupScreen} />}

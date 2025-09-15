@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
+import { SwipeCard, SessionExitModal, SessionStatistics } from '@/components';
+import { CachedMediaItem } from '@/types';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -28,14 +30,22 @@ interface LocalMediaItem {
 
 const LocalOrganizeScreen: React.FC = () => {
   const [mediaItems, setMediaItems] = useState<LocalMediaItem[]>([]);
+  const [cachedMediaItems, setCachedMediaItems] = useState<CachedMediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [keepCount, setKeepCount] = useState(0);
   const [deleteCount, setDeleteCount] = useState(0);
   const [deletedItems, setDeletedItems] = useState<Set<string>>(new Set());
+  const [undoStack, setUndoStack] = useState<Array<{ item: CachedMediaItem; action: 'keep' | 'delete'; timestamp: number }>>([]);
+  const [showSessionExitModal, setShowSessionExitModal] = useState(false);
+  const [sessionStartTime] = useState(Date.now());
   
   const isLocalMode = useAppSelector(selectIsLocalMode);
+
+  // Session management
+  const hasUnsavedChanges = keepCount > 0 || deleteCount > 0;
+  const canUndo = undoStack.length > 0;
 
   useEffect(() => {
     requestPermissionAndLoadMedia();
@@ -106,6 +116,28 @@ const LocalOrganizeScreen: React.FC = () => {
 
       console.log('Formatted items:', formattedItems.length);
       setMediaItems(formattedItems);
+      
+      // Convert to CachedMediaItem format for SwipeCardStackWithUndo
+      const cachedItems: CachedMediaItem[] = formattedItems.map(item => ({
+        id: item.id,
+        filename: item.filename,
+        mimeType: item.mediaType === 'photo' ? 'image/jpeg' : 'video/mp4',
+        baseUrl: item.uri, // Use the local URI directly
+        mediaMetadata: {
+          creationTime: new Date(item.creationTime).toISOString(),
+          width: item.width.toString(),
+          height: item.height.toString(),
+        },
+        cachedAt: Date.now(),
+        lastAccessed: Date.now(),
+        organizationStatus: 'pending',
+      }));
+      
+      console.log('Sample cached item:', cachedItems[0]);
+      console.log('Total cached items:', cachedItems.length);
+      console.log('Sample URI:', cachedItems[0]?.baseUrl);
+      
+      setCachedMediaItems(cachedItems);
     } catch (error) {
       console.error('Error loading media items:', error);
       Alert.alert(
@@ -125,61 +157,68 @@ const LocalOrganizeScreen: React.FC = () => {
     }
   };
 
-  const handleSwipeLeft = async () => {
+  const handleSwipeLeft = useCallback((item: CachedMediaItem) => {
+    console.log('Swiping left (delete) on item:', item.filename);
     // Delete action
-    const currentItem = mediaItems[currentIndex];
-    if (!currentItem) return;
-
-    try {
-      // Mark for deletion (in a real app, you might want to move to trash first)
-      setDeletedItems(prev => new Set([...prev, currentItem.id]));
-      setDeleteCount(prev => prev + 1);
-      
-      // Move to next item
-      setCurrentIndex(prev => prev + 1);
-      
-      // Show confirmation
-      Alert.alert(
-        'Photo Marked for Deletion',
-        `${currentItem.filename} will be deleted from your device.`,
-        [
-          {
-            text: 'Undo',
-            onPress: () => {
-              setDeletedItems(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(currentItem.id);
-                return newSet;
-              });
-              setDeleteCount(prev => prev - 1);
-            },
-          },
-          {
-            text: 'OK',
-            style: 'default',
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Error marking item for deletion:', error);
-      Alert.alert('Error', 'Failed to mark item for deletion.');
-    }
-  };
-
-  const handleSwipeRight = () => {
-    // Keep action
-    setKeepCount(prev => prev + 1);
+    setDeletedItems(prev => new Set([...prev, item.id]));
+    setDeleteCount(prev => {
+      const newCount = prev + 1;
+      console.log('Delete count updated to:', newCount);
+      return newCount;
+    });
     setCurrentIndex(prev => prev + 1);
-  };
+    
+    // Add to undo stack
+    setUndoStack(prev => [...prev, { item, action: 'delete', timestamp: Date.now() }]);
+  }, []);
 
-  const handleActualDelete = async () => {
+  const handleSwipeRight = useCallback((item: CachedMediaItem) => {
+    console.log('Swiping right (keep) on item:', item.filename);
+    // Keep action
+    setKeepCount(prev => {
+      const newCount = prev + 1;
+      console.log('Keep count updated to:', newCount);
+      return newCount;
+    });
+    setCurrentIndex(prev => prev + 1);
+    
+    // Add to undo stack
+    setUndoStack(prev => [...prev, { item, action: 'keep', timestamp: Date.now() }]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    
+    const lastAction = undoStack[undoStack.length - 1];
+    if (!lastAction) return;
+    
+    // Revert the action
+    if (lastAction.action === 'delete') {
+      setDeletedItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(lastAction.item.id);
+        return newSet;
+      });
+      setDeleteCount(prev => prev - 1);
+    } else {
+      setKeepCount(prev => prev - 1);
+    }
+    
+    // Move back to previous item
+    setCurrentIndex(prev => prev - 1);
+    
+    // Remove from undo stack
+    setUndoStack(prev => prev.slice(0, -1));
+  }, [undoStack]);
+
+  const handleCommitSession = useCallback(async () => {
     if (deletedItems.size === 0) {
-      Alert.alert('No Items', 'No items are marked for deletion.');
+      Alert.alert('No Changes', 'No items are marked for deletion.');
       return;
     }
 
     Alert.alert(
-      'Confirm Deletion',
+      'Commit Session',
       `Are you sure you want to permanently delete ${deletedItems.size} items? This cannot be undone.`,
       [
         {
@@ -196,11 +235,12 @@ const LocalOrganizeScreen: React.FC = () => {
               
               Alert.alert('Success', `${itemsToDelete.length} items deleted successfully.`);
               
-              // Reload media items
+              // Reset session
               setDeletedItems(new Set());
               setCurrentIndex(0);
               setKeepCount(0);
               setDeleteCount(0);
+              setUndoStack([]);
               await loadMediaItems();
             } catch (error) {
               console.error('Error deleting items:', error);
@@ -210,7 +250,21 @@ const LocalOrganizeScreen: React.FC = () => {
         },
       ]
     );
-  };
+  }, [deletedItems]);
+
+  const handleDiscardSession = useCallback(() => {
+    // Reset all session data
+    setDeletedItems(new Set());
+    setCurrentIndex(0);
+    setKeepCount(0);
+    setDeleteCount(0);
+    setUndoStack([]);
+    setShowSessionExitModal(false);
+  }, []);
+
+  const handleCancelExit = useCallback(() => {
+    setShowSessionExitModal(false);
+  }, []);
 
   const renderPermissionScreen = () => (
     <View style={styles.centerContainer}>
@@ -238,7 +292,7 @@ const LocalOrganizeScreen: React.FC = () => {
     <View style={styles.centerContainer}>
       <Text style={styles.title}>Organization Complete!</Text>
       <Text style={styles.subtitle}>
-        You've organized {mediaItems.length} items
+        You've organized {cachedMediaItems.length} items
       </Text>
       <Text style={styles.stats}>
         Kept: {keepCount} • Marked for deletion: {deleteCount}
@@ -247,7 +301,7 @@ const LocalOrganizeScreen: React.FC = () => {
       {deleteCount > 0 && (
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
-          onPress={handleActualDelete}
+          onPress={handleCommitSession}
         >
           <Text style={styles.buttonText}>Delete Marked Items</Text>
         </TouchableOpacity>
@@ -302,7 +356,7 @@ const LocalOrganizeScreen: React.FC = () => {
     );
   }
 
-  if (currentIndex >= mediaItems.length) {
+  if (currentIndex >= cachedMediaItems.length) {
     return (
       <SafeAreaView style={styles.container}>
         {renderCompletionScreen()}
@@ -315,81 +369,194 @@ const LocalOrganizeScreen: React.FC = () => {
       {/* Progress indicator */}
       <View style={styles.progressContainer}>
         <Text style={styles.progressText}>
-          {currentIndex + 1} of {mediaItems.length}
+          {currentIndex + 1} of {cachedMediaItems.length}
         </Text>
         <View style={styles.progressBar}>
           <View 
             style={[
               styles.progressFill, 
-              { width: `${((currentIndex + 1) / mediaItems.length) * 100}%` }
+              { width: `${((currentIndex + 1) / cachedMediaItems.length) * 100}%` }
             ]} 
           />
         </View>
         <Text style={styles.statsText}>
           Keep: {keepCount} • Delete: {deleteCount}
         </Text>
+        
+        {/* Session Statistics */}
+        <View style={styles.sessionStatsContainer}>
+          <View style={styles.sessionStatsRow}>
+            <View style={styles.sessionStat}>
+              <Text style={styles.sessionStatNumber}>{keepCount + deleteCount}</Text>
+              <Text style={styles.sessionStatLabel}>Total</Text>
+            </View>
+            <View style={styles.sessionStat}>
+              <Text style={[styles.sessionStatNumber, styles.keepColor]}>{keepCount}</Text>
+              <Text style={styles.sessionStatLabel}>Kept</Text>
+            </View>
+            <View style={styles.sessionStat}>
+              <Text style={[styles.sessionStatNumber, styles.deleteColor]}>{deleteCount}</Text>
+              <Text style={styles.sessionStatLabel}>Deleted</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
-      {/* Current photo */}
-      <View style={styles.photoContainer}>
-        {currentItem && (
-          <>
-            <Image
-              source={{ uri: currentItem.uri }}
-              style={styles.photo}
-              resizeMode="contain"
-              onError={(error) => {
-                console.error('Image load error for', currentItem.filename, ':', error.nativeEvent.error);
-                Alert.alert(
-                  'Image Load Error',
-                  `Failed to load ${currentItem.filename}. Skipping to next photo.`,
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => setCurrentIndex(prev => prev + 1),
-                    },
-                  ]
-                );
-              }}
-              onLoad={() => {
-                console.log('Image loaded successfully:', currentItem.filename);
-              }}
-            />
-            <Text style={styles.photoInfo}>
-              {currentItem.filename}
+      {/* Swipe Card Stack */}
+      <View style={styles.cardContainer}>
+        {cachedMediaItems.length > 0 && currentIndex < cachedMediaItems.length ? (
+          <View style={styles.cardWrapper}>
+            {/* Simple fallback image display for testing */}
+            <View style={styles.simpleCard}>
+              <Image
+                source={{ uri: cachedMediaItems[currentIndex]?.baseUrl || '' }}
+                style={styles.simpleImage}
+                resizeMode="cover"
+                onError={(error) => {
+                  console.error('Failed to load image:', error.nativeEvent.error);
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully');
+                }}
+              />
+              <View style={styles.simpleCardInfo}>
+                <Text style={styles.simpleCardText}>
+                  {cachedMediaItems[currentIndex]?.filename || 'Unknown'}
+                </Text>
+              </View>
+            </View>
+            
+            {/* Action buttons */}
+            <View style={styles.simpleActions}>
+              <TouchableOpacity
+                style={[styles.simpleActionButton, styles.deleteActionButton]}
+                onPress={() => {
+                  const currentItem = cachedMediaItems[currentIndex];
+                  if (currentItem) {
+                    handleSwipeLeft(currentItem);
+                  }
+                }}
+                activeOpacity={0.8}
+                disabled={!cachedMediaItems[currentIndex]}
+              >
+                <Text style={styles.simpleActionButtonText}>🗑️ Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.simpleActionButton, styles.keepActionButton]}
+                onPress={() => {
+                  const currentItem = cachedMediaItems[currentIndex];
+                  if (currentItem) {
+                    handleSwipeRight(currentItem);
+                  }
+                }}
+                activeOpacity={0.8}
+                disabled={!cachedMediaItems[currentIndex]}
+              >
+                <Text style={styles.simpleActionButtonText}>✅ Keep</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Debug info */}
+            <View style={styles.debugInfo}>
+              <Text style={styles.debugText}>
+                Current: {currentIndex + 1}/{cachedMediaItems.length}
+              </Text>
+              <Text style={styles.debugText}>
+                File: {cachedMediaItems[currentIndex]?.filename}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.centerContainer}>
+            <Text style={styles.loadingText}>
+              {cachedMediaItems.length === 0 ? 'Preparing photos...' : 'No more photos'}
             </Text>
-          </>
+            <Text style={styles.debugText}>
+              Items: {cachedMediaItems.length}, Index: {currentIndex}
+            </Text>
+          </View>
         )}
       </View>
 
-      {/* Action buttons */}
-      <View style={styles.actionsContainer}>
+      {/* Action Bar - Always show when there are actions */}
+      <View style={styles.actionBarContainer}>
+        {canUndo && (
+          <TouchableOpacity
+            style={styles.undoButton}
+            onPress={handleUndo}
+          >
+            <Text style={styles.undoButtonText}>Undo Last Action</Text>
+          </TouchableOpacity>
+        )}
+        {hasUnsavedChanges && (
+          <TouchableOpacity
+            style={styles.commitButton}
+            onPress={handleCommitSession}
+          >
+            <Text style={styles.commitButtonText}>
+              Commit Session ({deleteCount} to delete)
+            </Text>
+          </TouchableOpacity>
+        )}
+        {!canUndo && !hasUnsavedChanges && (
+          <View style={styles.noActionsContainer}>
+            {/* Removed instructional text - actions are now clear through buttons */}
+          </View>
+        )}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtonsContainer}>
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
-          onPress={handleSwipeLeft}
+          onPress={() => {
+            const currentItem = cachedMediaItems[currentIndex];
+            if (currentItem) {
+              handleSwipeLeft(currentItem);
+            }
+          }}
+          activeOpacity={0.8}
+          disabled={!cachedMediaItems[currentIndex]}
         >
           <Text style={styles.actionButtonText}>Delete</Text>
         </TouchableOpacity>
-        
         <TouchableOpacity
           style={[styles.actionButton, styles.keepButton]}
-          onPress={handleSwipeRight}
+          onPress={() => {
+            const currentItem = cachedMediaItems[currentIndex];
+            if (currentItem) {
+              handleSwipeRight(currentItem);
+            }
+          }}
+          activeOpacity={0.8}
+          disabled={!cachedMediaItems[currentIndex]}
         >
           <Text style={styles.actionButtonText}>Keep</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Instructions */}
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsText}>
-          Tap Delete to remove • Tap Keep to save
-        </Text>
-        {isLocalMode && (
+      
+      {isLocalMode && (
+        <View style={styles.localModeIndicator}>
           <Text style={styles.localModeText}>
             Local Gallery Mode - No Google Photos sync
           </Text>
-        )}
-      </View>
+        </View>
+      )}
+
+      {/* Session Exit Modal */}
+      <SessionExitModal
+        visible={showSessionExitModal}
+        isCommitting={false}
+        sessionStats={{
+          totalProcessed: keepCount + deleteCount,
+          keepCount,
+          deleteCount,
+          sessionDuration: Date.now() - sessionStartTime,
+        }}
+        onCommit={handleCommitSession}
+        onDiscard={handleDiscardSession}
+        onCancel={handleCancelExit}
+      />
     </SafeAreaView>
   );
 };
@@ -432,9 +599,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-  },
   loadingText: {
     fontSize: 16,
     color: '#666',
@@ -444,8 +608,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   progressText: {
     fontSize: 16,
@@ -469,6 +638,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  sessionStatsContainer: {
+    marginTop: 12,
+  },
+  cardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   stats: {
     fontSize: 16,
@@ -501,12 +678,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     justifyContent: 'space-around',
   },
-  actionButton: {
-    paddingHorizontal: 32,
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    borderRadius: 25,
-    minWidth: 120,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
   },
   keepButton: {
     backgroundColor: '#34C759',
@@ -516,23 +714,153 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  instructionsContainer: {
+  localModeIndicator: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
   },
   localModeText: {
     fontSize: 12,
     color: '#999',
     textAlign: 'center',
-    marginTop: 4,
+  },
+  actionBarContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    minHeight: 60,
+    gap: 12,
+  },
+  undoButton: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  undoButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  commitButton: {
+    backgroundColor: '#34C759',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  commitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cardWrapper: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderRadius: 4,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  simpleCard: {
+    width: screenWidth * 0.9,
+    height: screenHeight * 0.6,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  simpleImage: {
+    width: '100%',
+    height: '85%',
+  },
+  simpleCardInfo: {
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  simpleCardText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+  },
+  simpleActions: {
+    flexDirection: 'row',
+    marginTop: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    width: '100%',
+  },
+  simpleActionButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 8,
+    minWidth: 120,
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  deleteActionButton: {
+    backgroundColor: '#FF3B30',
+  },
+  keepActionButton: {
+    backgroundColor: '#34C759',
+  },
+  simpleActionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  sessionStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+  },
+  sessionStat: {
+    alignItems: 'center',
+  },
+  sessionStatNumber: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 2,
+  },
+  sessionStatLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  keepColor: {
+    color: '#34C759',
+  },
+  deleteColor: {
+    color: '#FF3B30',
+  },
+  noActionsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -7,9 +7,11 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
+import { useRoute, RouteProp } from '@react-navigation/native';
 import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '../components';
 import { useNavigationGuard } from '../hooks/useNavigationGuard';
 import { RootState } from '../store';
@@ -29,7 +31,7 @@ import {
   resetOrganization,
 } from '../store/slices/organizationSlice';
 import { useGetMediaItemsQuery } from '../store/api/googlePhotosApi';
-import { CachedMediaItem, SwipeAction } from '../types';
+import { CachedMediaItem, SwipeAction, OrganiseStackParamList } from '../types';
 import OrganizationSessionService from '../services/OrganizationSessionService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -42,11 +44,17 @@ interface OrganizationDecision {
   timestamp: number;
 }
 
+type OrganizeScreenRouteProp = RouteProp<OrganiseStackParamList, 'SwipeMode'>;
+
 const OrganizeScreen: React.FC = () => {
   const dispatch = useDispatch();
+  const route = useRoute<OrganizeScreenRouteProp>();
   const [isInitialized, setIsInitialized] = useState(false);
   const [showSessionExitModal, setShowSessionExitModal] = useState(false);
   const [isCommittingSession, setIsCommittingSession] = useState(false);
+  
+  // Get navigation parameters
+  const { startingPhotoId, startMode = 'natural' } = route.params || {};
   
   // Redux selectors
   const organizationState = useSelector((state: RootState) => state.organization);
@@ -124,9 +132,10 @@ const OrganizeScreen: React.FC = () => {
           await OrganizationSessionService.clearCurrentSession();
         }
         
-        // Start a new session in natural mode (default)
+        // Start a new session with the provided parameters
         dispatch(startOrganizationSession({
-          startMode: 'natural',
+          startMode,
+          ...(startingPhotoId && { startingPhotoId }),
         }));
       }
       
@@ -375,18 +384,30 @@ const OrganizeScreen: React.FC = () => {
           onSwipeLeft={handleSwipeLeft}
           onSwipeRight={handleSwipeRight}
           onUndo={handleUndo}
+          onCommit={handleCommitSession}
           canUndo={canUndo}
+          canCommit={hasUnsavedChanges}
           undoTimeoutMs={5000}
-
-          undoPosition="bottom"
+          actionBarPosition="bottom"
         />
       </View>
 
-      {/* Instructions */}
-      <View style={styles.instructionsContainer}>
-        <Text style={styles.instructionsText}>
-          Swipe left to delete • Swipe right to keep
-        </Text>
+      {/* Action Buttons */}
+      <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => currentMediaItem && handleSwipeLeft(currentMediaItem)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.actionButtonText}>Delete</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.keepButton]}
+          onPress={() => currentMediaItem && handleSwipeRight(currentMediaItem)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.actionButtonText}>Keep</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Session Exit Modal */}
@@ -452,17 +473,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  instructionsContainer: {
+  actionButtonsContainer: {
+    flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+    justifyContent: 'space-between',
+    gap: 16,
   },
-  instructionsText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+  actionButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+  },
+  keepButton: {
+    backgroundColor: '#34C759',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

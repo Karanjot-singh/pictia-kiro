@@ -10,8 +10,8 @@ import * as Haptics from 'expo-haptics';
 
 interface CardActionBarProps {
   visible: boolean;
-  onUndo?: () => void;
-  onCommit?: () => void;
+  onUndo?: (() => void) | undefined;
+  onCommit?: (() => void) | undefined;
   style?: any;
   position?: 'top' | 'bottom';
   enableHaptics?: boolean;
@@ -102,9 +102,12 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Undo last action"
           >
-            <Ionicons name="arrow-undo" size={20} color="#fff" />
+            <Ionicons name="arrow-undo" size={24} color="#fff" />
           </TouchableOpacity>
         )}
+        
+        {/* Spacer to push commit button to the right */}
+        {!onUndo && <View style={styles.spacer} />}
         
         {onCommit && (
           <TouchableOpacity
@@ -115,7 +118,7 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
             accessibilityRole="button"
             accessibilityLabel="Commit session changes"
           >
-            <Ionicons name="checkmark" size={20} color="#fff" />
+            <Ionicons name="checkmark-done" size={24} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -126,7 +129,7 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
 const styles = StyleSheet.create({
   containerTop: {
     position: 'absolute',
-    top: 20,
+    top: 60, // Move down to avoid status bar
     left: 0,
     right: 0,
     zIndex: 1000,
@@ -142,6 +145,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    alignItems: 'center',
   },
   actionButton: {
     width: 50,
@@ -163,6 +167,9 @@ const styles = StyleSheet.create({
   },
   commitButton: {
     backgroundColor: 'rgba(52, 199, 89, 0.9)',
+  },
+  spacer: {
+    flex: 1,
   },
 });
 

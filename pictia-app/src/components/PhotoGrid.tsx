@@ -79,7 +79,7 @@ const PhotoGrid: React.FC<PhotoGridProps> = ({
 
   // Get item layout for performance optimization
   const getItemLayout = useCallback(
-    (data: CachedMediaItem[] | null | undefined, index: number) => ({
+    (data: ArrayLike<CachedMediaItem> | null | undefined, index: number) => ({
       length: thumbnailSize + GRID_SPACING,
       offset: (thumbnailSize + GRID_SPACING) * Math.floor(index / numColumns),
       index,

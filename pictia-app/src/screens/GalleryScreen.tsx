@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { OrganiseStackParamList } from '@/types';
 import {
   PhotoGrid,
   FullScreenViewer,
@@ -20,11 +22,13 @@ import { useGetMediaItemsQuery } from '@/store/api/googlePhotosApi';
 import { CachedMediaItem } from '@/types';
 import ReviewTracker from '@/services/ReviewTracker';
 
+type GalleryScreenNavigationProp = StackNavigationProp<OrganiseStackParamList, 'Gallery'>;
+
 interface GalleryScreenProps {}
 
 const GalleryScreen: React.FC<GalleryScreenProps> = () => {
   const dispatch = useDispatch();
-  const navigation = useNavigation();
+  const navigation = useNavigation<GalleryScreenNavigationProp>();
 
   // Local state
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -47,7 +51,7 @@ const GalleryScreen: React.FC<GalleryScreenProps> = () => {
     pageSize: 100,
   });
 
-  const mediaItems = useMemo(() => mediaData?.mediaItems || [], [mediaData]);
+  const mediaItems = useMemo(() => mediaData?.items || [], [mediaData]);
 
   // Initialize review tracker and load reviewed items
   useEffect(() => {
@@ -116,30 +120,25 @@ const GalleryScreen: React.FC<GalleryScreenProps> = () => {
   const handleStartSwipeMode = useCallback(() => {
     if (!fullScreenItem) return;
 
-    // Navigate to organize screen with starting photo
-    // This would need to be implemented based on your navigation structure
-    Alert.alert(
-      'Start Organization',
-      'This will start the swipe-based organization mode from this photo.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Start', 
-          onPress: () => {
-            // TODO: Navigate to organize screen with starting photo
-            console.log('Starting organization from photo:', fullScreenItem.id);
-          }
-        },
-      ]
-    );
-  }, [fullScreenItem]);
+    // Close full-screen viewer first
+    setFullScreenItem(null);
+    
+    // Navigate to swipe mode with starting photo
+    navigation.navigate('SwipeMode', {
+      startingPhotoId: fullScreenItem.id,
+      startMode: 'gallery',
+    });
+  }, [fullScreenItem, navigation]);
 
   // Handle navigation in full-screen viewer
   const handleNavigatePrevious = useCallback(() => {
     if (currentPhotoIndex > 0) {
       const newIndex = currentPhotoIndex - 1;
       setCurrentPhotoIndex(newIndex);
-      setFullScreenItem(mediaItems[newIndex]);
+      const item = mediaItems[newIndex];
+      if (item) {
+        setFullScreenItem(item);
+      }
     }
   }, [currentPhotoIndex, mediaItems]);
 
@@ -147,7 +146,10 @@ const GalleryScreen: React.FC<GalleryScreenProps> = () => {
     if (currentPhotoIndex < mediaItems.length - 1) {
       const newIndex = currentPhotoIndex + 1;
       setCurrentPhotoIndex(newIndex);
-      setFullScreenItem(mediaItems[newIndex]);
+      const item = mediaItems[newIndex];
+      if (item) {
+        setFullScreenItem(item);
+      }
     }
   }, [currentPhotoIndex, mediaItems]);
 
@@ -219,9 +221,8 @@ const GalleryScreen: React.FC<GalleryScreenProps> = () => {
     return (
       <SafeAreaView style={styles.container}>
         <ErrorDisplay
-          error={error}
+          error={error ? { message: `Unable to Load Photos: ${error.toString()}` } : null}
           onRetry={handleRefresh}
-          title="Unable to Load Photos"
         />
       </SafeAreaView>
     );

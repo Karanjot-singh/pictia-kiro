@@ -35,8 +35,8 @@ interface FullScreenViewerProps {
   isVisible: boolean;
   onClose: () => void;
   onStartSwipeMode: () => void;
-  onNavigatePrevious?: () => void;
-  onNavigateNext?: () => void;
+  onNavigatePrevious?: (() => void) | undefined;
+  onNavigateNext?: (() => void) | undefined;
   showNavigation?: boolean;
 }
 
@@ -65,9 +65,9 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
   const focalY = useSharedValue(0);
 
   // Refs for gesture handlers
-  const pinchRef = useRef();
-  const panRef = useRef();
-  const tapRef = useRef();
+  const pinchRef = useRef(null);
+  const panRef = useRef(null);
+  const tapRef = useRef(null);
 
   // Calculate image display dimensions
   const getImageDisplaySize = useCallback(() => {
@@ -107,11 +107,11 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
 
   // Pinch gesture handler
   const pinchGestureHandler = useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
-    onStart: (_, context) => {
+    onStart: (_, context: any) => {
       context.startScale = scale.value;
     },
-    onActive: (event, context) => {
-      const newScale = context.startScale * event.scale;
+    onActive: (event, context: any) => {
+      const newScale = (context.startScale as number) * event.scale;
       scale.value = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
       
       focalX.value = event.focalX;
@@ -128,14 +128,14 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
 
   // Pan gesture handler
   const panGestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-    onStart: (_, context) => {
+    onStart: (_, context: any) => {
       context.startX = translateX.value;
       context.startY = translateY.value;
     },
-    onActive: (event, context) => {
+    onActive: (event, context: any) => {
       if (scale.value > 1) {
-        translateX.value = context.startX + event.translationX;
-        translateY.value = context.startY + event.translationY;
+        translateX.value = (context.startX as number) + event.translationX;
+        translateY.value = (context.startY as number) + event.translationY;
       }
     },
     onEnd: () => {

@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { CachedMediaItem, SwipeAction } from '../types';
 import { GestureConfigOptions } from './GestureConfig';
@@ -20,8 +21,8 @@ interface SwipeCardProps {
   mediaItem: CachedMediaItem;
   onSwipeLeft: (item: CachedMediaItem) => void;
   onSwipeRight: (item: CachedMediaItem) => void;
-  onUndo?: () => void;
-  onCommit?: () => void;
+  onUndo?: (() => void) | undefined;
+  onCommit?: (() => void) | undefined;
   showActionBar?: boolean;
   config?: Partial<GestureConfigOptions>;
   style?: any;
@@ -39,6 +40,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   style,
   undoTimeoutMs = 5000,
 }) => {
+  console.log('SwipeCard rendering with mediaItem:', mediaItem?.filename, mediaItem?.baseUrl);
   // Default configuration
   const defaultConfig: GestureConfigOptions = {
     swipeThreshold: screenWidth * 0.3,
@@ -87,6 +89,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   };
 
   const animateCard = (x: number, y: number) => {
+    'worklet';
     const rotation = finalConfig.cardRotationEnabled 
       ? (x / screenWidth) * finalConfig.maxRotationDegrees 
       : 0;
@@ -97,10 +100,10 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
     rotate.setValue(rotation);
     scale.setValue(cardScale);
 
-    // Show action bar when card is being dragged
+    // Show action bar when card is being dragged - use runOnJS for state updates
     const shouldShowActionBar = showActionBar && Math.abs(x) > 20;
     if (shouldShowActionBar !== isActionBarVisible) {
-      setIsActionBarVisible(shouldShowActionBar);
+      runOnJS(setIsActionBarVisible)(shouldShowActionBar);
       Animated.timing(actionBarOpacity, {
         toValue: shouldShowActionBar ? 1 : 0,
         duration: 150,
@@ -110,7 +113,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
 
     // Trigger threshold haptic feedback when crossing threshold
     if (Math.abs(x) > finalConfig.swipeThreshold) {
-      triggerThresholdHaptic();
+      runOnJS(triggerThresholdHaptic)();
     } else {
       hasTriggeredThresholdHaptic.current = false;
     }
@@ -154,13 +157,13 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   };
 
   const swipeCard = (direction: 'left' | 'right') => {
+    'worklet';
     const toValue = direction === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
     const action: SwipeAction = direction === 'right' ? 'keep' : 'delete';
 
-    // Final haptic feedback with enhanced intensity
-    triggerHapticFeedback(action, action === 'delete' ? 'heavy' : 'medium');
-
-    setIsActionBarVisible(false);
+    // Final haptic feedback with enhanced intensity - use runOnJS
+    runOnJS(triggerHapticFeedback)(action, action === 'delete' ? 'heavy' : 'medium');
+    runOnJS(setIsActionBarVisible)(false);
 
     Animated.parallel([
       Animated.timing(translateX, {
@@ -179,20 +182,22 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Call the appropriate callback after animation
+      // Call the appropriate callback after animation - use runOnJS
       if (direction === 'left') {
-        onSwipeLeft(mediaItem);
+        runOnJS(onSwipeLeft)(mediaItem);
       } else {
-        onSwipeRight(mediaItem);
+        runOnJS(onSwipeRight)(mediaItem);
       }
     });
   };
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
+      'worklet';
       animateCard(event.translationX, event.translationY * 0.1); // Reduce vertical movement
     })
     .onEnd((event) => {
+      'worklet';
       const { translationX, velocityX } = event;
       
       // Determine if swipe should complete based on distance or velocity
@@ -240,6 +245,12 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           source={{ uri: mediaItem.baseUrl }}
           style={styles.image}
           resizeMode="cover"
+          onError={(error) => {
+            console.warn('Failed to load image:', mediaItem.filename, error.nativeEvent.error);
+          }}
+          onLoad={() => {
+            console.log('Successfully loaded image:', mediaItem.filename);
+          }}
         />
         
         {/* Delete Overlay */}

@@ -29,7 +29,10 @@ const PhotoThumbnail: React.FC<PhotoThumbnailProps> = memo(({
   onLongPress,
 }) => {
   // Generate thumbnail URL with appropriate size
-  const thumbnailUrl = `${mediaItem.baseUrl}=w${Math.round(size * 2)}-h${Math.round(size * 2)}-c`;
+  // For local media, use the baseUrl directly; for Google Photos, append size parameters
+  const thumbnailUrl = mediaItem.baseUrl.startsWith('file://') || mediaItem.baseUrl.startsWith('content://') 
+    ? mediaItem.baseUrl 
+    : `${mediaItem.baseUrl}=w${Math.round(size * 2)}-h${Math.round(size * 2)}-c`;
 
   // Determine if this is a video
   const isVideo = mediaItem.mimeType.startsWith('video/');
@@ -54,6 +57,9 @@ const PhotoThumbnail: React.FC<PhotoThumbnailProps> = memo(({
           isSelected && styles.selectedImage,
         ]}
         resizeMode="cover"
+        onError={(error) => {
+          console.warn('Failed to load thumbnail for:', mediaItem.filename, error.nativeEvent.error);
+        }}
       />
 
       {/* Video indicator */}

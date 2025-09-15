@@ -29,7 +29,7 @@
     - Create AuthNavigator to handle authentication flow
     - _Requirements: 1.1, 1.4, 1.5_
 
-  - [ ] 2.4 Update navigation structure for gallery mode
+  - [x] 2.4 Update navigation structure for gallery mode
     - Convert MainNavigator to bottom tab navigation with "Organise" tab
     - Rename existing OrganizeScreen tab from "Local Gallery" to "Organise"
     - Add proper tab icons and navigation structure
@@ -221,15 +221,53 @@
     - Implement final error handling and edge case coverage
     - _Requirements: 3.2, 3.3, 3.4_
 
-- [ ] 13. Configuration Validation and Developer Tools
-  - [ ] 13.1 Create configuration validation system
+- [-] 13. Enhanced Organization Mode UI Improvements
+  - [x] 13.1 Simplify organization interface controls
+    - Remove instructional text ("Make decisions to see.." and "Swipe left...") from organize screen
+    - Replace text instructions with Keep and Delete buttons for clearer action options
+    - Implement button-based actions as alternative to swipe gestures
+    - Ensure buttons maintain same functionality as swipe actions (mark for keep/delete)
+    - _Requirements: 3.1, 3.2, 3.3_
+
+  - [x] 13.2 Add organize icon to bottom navigation
+    - Add "Organize" tab icon to bottom navigation bar alongside Gallery and Settings
+    - Create dedicated OrganizeScreen that launches organization mode directly
+    - Implement smart photo selection logic: start from selected photo or last unreviewed photo
+    - Ensure organize mode always skips already reviewed photos
+    - _Requirements: 2.7, 3.7, 3.8, 3.11_
+
+  - [ ] 13.3 Enhance card action controls
+    - Move undo button to top-left of card stack (simple undo icon)
+    - Add commit button to top-right of card stack (double-check icon)
+    - Simplify UI by removing complex action bars and using minimal icon-based controls
+    - Ensure undo functionality works with both swipe and button actions
+    - _Requirements: 3.4, 3.5, 3.6_
+
+  - [ ] 13.4 Implement photo deletion on session close
+    - Ensure photos marked as "delete" are actually deleted when session is committed
+    - Implement deletion logic when user closes organization session
+    - Add deletion logic when user closes the app with pending delete actions
+    - Create proper cleanup of deleted photos from local tracking and Google Photos
+    - _Requirements: 3.6, 3.9, 3.10_
+
+  - [ ] 13.5 Verify and fix core organization functionality
+    - Test and ensure Keep button properly marks photos for keeping
+    - Test and ensure Delete button properly marks photos for deletion
+    - Verify commit session functionality actually processes all pending actions
+    - Fix any issues with session state management and action persistence
+    - Ensure undo functionality works correctly with both button and swipe actions
+    - Test photo review tracking to ensure reviewed photos are properly skipped
+    - _Requirements: 3.1, 3.2, 3.4, 3.5, 3.6, 3.11_
+
+- [ ] 14. Configuration Validation and Developer Tools
+  - [ ] 14.1 Create configuration validation system
     - Implement ConfigValidator class to check Google Cloud setup
     - Add runtime validation for OAuth configuration and redirect URIs
     - Create API quota monitoring and developer warnings
     - Build configuration troubleshooting guide and error messages
     - _Requirements: 1.4, 9.1, 9.2_
 
-  - [ ] 13.2 Build development and debugging tools
+  - [ ] 14.2 Build development and debugging tools
     - Create debug screens for testing API connectivity
     - Add developer mode with detailed logging and error information
     - Implement configuration export/import for team development

@@ -2,6 +2,7 @@
 
 // Re-export Google Photos types
 export * from './googlePhotos';
+export type { CachedMediaItem } from './googlePhotos';
 
 // Authentication types
 export interface AuthResult {
@@ -169,8 +170,17 @@ export type AuthStackParamList = {
 };
 
 export type MainTabParamList = {
+  Organise: undefined;
   Organize: undefined;
   Backup: undefined;
   Upload: undefined;
   Settings: undefined;
+};
+
+export type OrganiseStackParamList = {
+  Gallery: undefined;
+  SwipeMode: {
+    startingPhotoId?: string;
+    startMode?: 'gallery' | 'natural';
+  };
 };

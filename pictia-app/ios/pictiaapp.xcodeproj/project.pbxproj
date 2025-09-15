@@ -21,6 +21,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = pictiaapp/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = pictiaapp/Info.plist; sourceTree = "<group>"; };
 		9196895BF7EB4464B57D7EE2 /* Pods-pictiaapp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-pictiaapp.release.xcconfig"; path = "Target Support Files/Pods-pictiaapp/Pods-pictiaapp.release.xcconfig"; sourceTree = "<group>"; };
+		9EF817612E76ED6B00648503 /* pictiaappDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = pictiaappDebug.entitlements; path = pictiaapp/pictiaappDebug.entitlements; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = pictiaapp/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		CF8296C4001386AAC1157A41 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-pictiaapp/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -47,6 +48,7 @@
 		13B07FAE1A68108700A75B9A /* pictiaapp */ = {
 			isa = PBXGroup;
 			children = (
+				9EF817612E76ED6B00648503 /* pictiaappDebug.entitlements */,
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748442D0722820044C1D9 /* pictiaapp-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
@@ -345,6 +347,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = pictiaapp/pictiaappDebug.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = LA9LW35RWU;
 				ENABLE_BITCODE = NO;
@@ -365,11 +368,12 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.pictiaapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pictia.app;
 				PRODUCT_NAME = pictiaapp;
 				SWIFT_OBJC_BRIDGING_HEADER = "pictiaapp/pictiaapp-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
@@ -380,6 +384,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = pictiaapp/pictiaapp.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = LA9LW35RWU;
 				INFOPLIST_FILE = pictiaapp/Info.plist;
@@ -395,10 +400,11 @@
 					"-lc++",
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = org.name.pictiaapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.pictia.app;
 				PRODUCT_NAME = pictiaapp;
 				SWIFT_OBJC_BRIDGING_HEADER = "pictiaapp/pictiaapp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
