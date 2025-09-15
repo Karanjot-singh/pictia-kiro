@@ -32,6 +32,7 @@ export { default as ModernTabBar } from './ModernTabBar';
 export { default as SplashScreen } from './SplashScreen';
 export { default as PermissionRequestDialog } from './PermissionRequestDialog';
 export { default as MediaPermissionRequest } from './MediaPermissionRequest';
+export { default as EnhancedButton } from './EnhancedButton';
 
 // Loading states and animations
 export {

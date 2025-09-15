@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ErrorDisplay } from './ErrorDisplay';
-import { ModernActionButton } from './ModernActionButton';
+import ModernActionButton from './ModernActionButton';
 import { THEME_COLORS, SPACING, BORDER_RADIUS, SHADOWS, TEXT_STYLES, TYPOGRAPHY } from '@/theme';
 
 // Network error component

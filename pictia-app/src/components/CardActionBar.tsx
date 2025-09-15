@@ -3,8 +3,10 @@ import {
   View,
   StyleSheet,
   Animated,
+  TouchableOpacity,
+  Text,
 } from 'react-native';
-import ModernActionButton from './ModernActionButton';
+import { Ionicons } from '@expo/vector-icons';
 import { SPACING } from '@/theme/spacing';
 
 interface CardActionBarProps {
@@ -87,24 +89,32 @@ const CardActionBar: React.FC<CardActionBarProps> = ({
     >
       <View style={styles.actionBar} testID="card-action-bar">
         {onUndo && (
-          <ModernActionButton
-            variant="undo"
-            size="medium"
+          <TouchableOpacity
+            style={styles.simpleUndoButton}
             onPress={handleUndo}
-            enableHaptics={enableHaptics}
-          />
+            activeOpacity={0.7}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons name="arrow-undo" size={18} color="#333" />
+              <Text style={styles.simpleUndoButtonText}>Undo</Text>
+            </View>
+          </TouchableOpacity>
         )}
-        
+
         {/* Spacer to push commit button to the right */}
         {!onUndo && <View style={styles.spacer} />}
-        
+
         {onCommit && (
-          <ModernActionButton
-            variant="commit"
-            size="medium"
+          <TouchableOpacity
+            style={styles.simpleCommitButton}
             onPress={handleCommit}
-            enableHaptics={enableHaptics}
-          />
+            activeOpacity={0.7}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.simpleCommitButtonText}>Commit</Text>
+            </View>
+          </TouchableOpacity>
         )}
       </View>
     </Animated.View>
@@ -134,6 +144,47 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
+  },
+  simpleUndoButton: {
+    backgroundColor: '#E9ECEF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  simpleCommitButton: {
+    backgroundColor: '#46A575',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  simpleUndoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  simpleCommitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 

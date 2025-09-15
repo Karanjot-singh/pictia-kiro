@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ModernActionButton } from './ModernActionButton';
+import ModernActionButton from './ModernActionButton';
 import { THEME_COLORS, SPACING, BORDER_RADIUS, TEXT_STYLES, TYPOGRAPHY, SHADOWS } from '@/theme';
 
 const { width: screenWidth } = Dimensions.get('window');

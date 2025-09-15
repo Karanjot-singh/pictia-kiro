@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Alert,
   Modal,
   Animated,
@@ -20,6 +19,7 @@ import {
   clearError,
 } from '@/store/slices/notificationSlice';
 import { THEME_COLORS, SPACING, TEXT_STYLES, SHADOWS, BORDER_RADIUS } from '@/theme';
+import EnhancedButton from './EnhancedButton';
 
 interface NotificationPermissionRequestProps {
   visible: boolean;
@@ -183,30 +183,27 @@ const NotificationPermissionRequest: React.FC<NotificationPermissionRequestProps
             </View>
             
             <View style={styles.buttons}>
-              <TouchableOpacity
-                style={[styles.primaryButton, isLoading && styles.disabledButton]}
+              <EnhancedButton
+                title={isLoading ? 'Requesting...' : 'Enable Notifications'}
                 onPress={handleRequestPermission}
+                variant="primary"
+                size="large"
                 disabled={isLoading}
-              >
-                <LinearGradient
-                  colors={THEME_COLORS.PRIMARY_GRADIENT}
-                  style={styles.buttonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    {isLoading ? 'Requesting...' : 'Enable Notifications'}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                loading={isLoading}
+                icon="notifications"
+                fullWidth
+                style={styles.primaryButton}
+              />
               
-              <TouchableOpacity
-                style={styles.secondaryButton}
+              <EnhancedButton
+                title="Maybe Later"
                 onPress={handleSkip}
+                variant="minimal"
+                size="large"
                 disabled={isLoading}
-              >
-                <Text style={styles.secondaryButtonText}>Maybe Later</Text>
-              </TouchableOpacity>
+                fullWidth
+                style={styles.secondaryButton}
+              />
             </View>
             
             <Text style={styles.disclaimer}>
@@ -331,36 +328,11 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    height: 56,
-    borderRadius: BORDER_RADIUS.LG,
     marginBottom: SPACING.MD,
-    overflow: 'hidden',
-    ...SHADOWS.BUTTON,
-  },
-
-  buttonGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.LG,
-  },
-
-  primaryButtonText: {
-    ...TEXT_STYLES.buttonText,
-    color: THEME_COLORS.WHITE,
-    fontSize: 16,
   },
 
   secondaryButton: {
-    paddingVertical: SPACING.MD,
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.MD,
-  },
-
-  secondaryButtonText: {
-    ...TEXT_STYLES.buttonText,
-    color: THEME_COLORS.TEXT_SECONDARY,
-    fontSize: 16,
+    // No additional styling needed - handled by EnhancedButton
   },
 
   disabledButton: {

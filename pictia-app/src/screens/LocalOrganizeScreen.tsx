@@ -13,7 +13,12 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
-import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics, ModernActionButton } from '@/components';
+import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '@/components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { THEME_COLORS } from '@/theme/colors';
+import { SHADOWS } from '@/theme/shadows';
+import { SPACING, BORDER_RADIUS } from '@/theme/spacing';
 import { CachedMediaItem } from '@/types';
 import ReviewTracker from '@/services/ReviewTracker';
 
@@ -41,7 +46,7 @@ const LocalOrganizeScreen: React.FC = () => {
   const [undoStack, setUndoStack] = useState<Array<{ item: CachedMediaItem; action: 'keep' | 'delete'; timestamp: number }>>([]);
   const [showSessionExitModal, setShowSessionExitModal] = useState(false);
   const [sessionStartTime] = useState(Date.now());
-  
+
   const isLocalMode = useAppSelector(selectIsLocalMode);
 
   // Session management
@@ -56,7 +61,7 @@ const LocalOrganizeScreen: React.FC = () => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       setHasPermission(status === 'granted');
-      
+
       if (status === 'granted') {
         await loadMediaItems();
       }
@@ -88,14 +93,14 @@ const LocalOrganizeScreen: React.FC = () => {
 
       // Sort assets by creation time (newest first)
       const sortedAssets = media.assets.sort((a, b) => b.creationTime - a.creationTime);
-      
+
       // Get asset info for each item to get proper URIs
       const formattedItems: LocalMediaItem[] = [];
-      
+
       for (const asset of sortedAssets) {
         try {
           const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-          
+
           formattedItems.push({
             id: asset.id,
             uri: assetInfo.localUri || asset.uri,
@@ -123,7 +128,7 @@ const LocalOrganizeScreen: React.FC = () => {
       console.log('Formatted items:', formattedItems.length);
       console.log('Sample formatted item:', formattedItems[0]);
       setMediaItems(formattedItems);
-      
+
       // Convert to CachedMediaItem format for SwipeCardStackWithUndo
       const allCachedItems: CachedMediaItem[] = formattedItems.map(item => ({
         id: item.id,
@@ -139,24 +144,24 @@ const LocalOrganizeScreen: React.FC = () => {
         lastAccessed: Date.now(),
         organizationStatus: 'pending',
       }));
-      
+
       // Filter out reviewed photos
       const reviewTracker = ReviewTracker.getInstance();
       await reviewTracker.initialize();
       await reviewTracker.refreshUnreviewedQueue(allCachedItems);
       const unreviewedItems = await reviewTracker.getUnreviewedQueue();
-      
+
       console.log('Sample cached item:', unreviewedItems[0]);
       console.log('Total unreviewed items:', unreviewedItems.length);
       console.log('Sample URI:', unreviewedItems[0]?.baseUrl);
       console.log('All cached items length:', allCachedItems.length);
       console.log('Unreviewed items length:', unreviewedItems.length);
-      
+
       setCachedMediaItems(unreviewedItems);
     } catch (error) {
       console.error('Error loading media items:', error);
       Alert.alert(
-        'Error Loading Photos', 
+        'Error Loading Photos',
         'Failed to load photos from your device. Please check that the app has permission to access your photos.',
         [
           {
@@ -187,16 +192,16 @@ const LocalOrganizeScreen: React.FC = () => {
       return newCount;
     });
     setCurrentIndex(prev => prev + 1);
-    
+
     // Add to undo stack
     setUndoStack(prev => [...prev, { item, action: 'delete', timestamp: Date.now() }]);
-    
+
     // Mark as reviewed immediately for real-time filtering (non-blocking)
     setTimeout(async () => {
       try {
         const reviewTracker = ReviewTracker.getInstance();
         await reviewTracker.markAsReviewed(item.id, 'delete');
-        
+
         // Update the cached media items to remove the reviewed photo
         const updatedQueue = await reviewTracker.getUnreviewedQueue();
         setCachedMediaItems(updatedQueue);
@@ -220,16 +225,16 @@ const LocalOrganizeScreen: React.FC = () => {
       return newCount;
     });
     setCurrentIndex(prev => prev + 1);
-    
+
     // Add to undo stack
     setUndoStack(prev => [...prev, { item, action: 'keep', timestamp: Date.now() }]);
-    
+
     // Mark as reviewed immediately for real-time filtering (non-blocking)
     setTimeout(async () => {
       try {
         const reviewTracker = ReviewTracker.getInstance();
         await reviewTracker.markAsReviewed(item.id, 'keep');
-        
+
         // Update the cached media items to remove the reviewed photo
         const updatedQueue = await reviewTracker.getUnreviewedQueue();
         setCachedMediaItems(updatedQueue);
@@ -241,10 +246,10 @@ const LocalOrganizeScreen: React.FC = () => {
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
-    
+
     const lastAction = undoStack[undoStack.length - 1];
     if (!lastAction) return;
-    
+
     // Revert the action
     if (lastAction.action === 'delete') {
       setDeletedItems(prev => {
@@ -256,19 +261,19 @@ const LocalOrganizeScreen: React.FC = () => {
     } else {
       setKeepCount(prev => prev - 1);
     }
-    
+
     // Move back to previous item
     setCurrentIndex(prev => prev - 1);
-    
+
     // Remove from undo stack
     setUndoStack(prev => prev.slice(0, -1));
-    
+
     // Remove the review status for the undone item and refresh queue (non-blocking)
     setTimeout(async () => {
       try {
         const reviewTracker = ReviewTracker.getInstance();
         await reviewTracker.removeReviewStatus(lastAction.item.id);
-        
+
         // Rebuild the queue from all media items
         const allCachedItems: CachedMediaItem[] = mediaItems.map(item => ({
           id: item.id,
@@ -284,7 +289,7 @@ const LocalOrganizeScreen: React.FC = () => {
           lastAccessed: Date.now(),
           organizationStatus: 'pending',
         }));
-        
+
         await reviewTracker.refreshUnreviewedQueue(allCachedItems);
         const updatedQueue = await reviewTracker.getUnreviewedQueue();
         setCachedMediaItems(updatedQueue);
@@ -319,7 +324,7 @@ const LocalOrganizeScreen: React.FC = () => {
       // Mark photos with their actions or as 'keep' if just viewed
       const tracker = ReviewTracker.getInstance();
       await tracker.initialize();
-      
+
       for (const photoId of viewedPhotoIds) {
         if (deletedItems.has(photoId)) {
           await tracker.markAsReviewed(photoId, 'delete');
@@ -410,19 +415,30 @@ const LocalOrganizeScreen: React.FC = () => {
       <Text style={styles.stats}>
         Kept: {keepCount} • Marked for deletion: {deleteCount}
       </Text>
-      
+
       {deleteCount > 0 && (
-        <View style={styles.modernButtonContainer}>
-          <ModernActionButton
-            variant="delete"
-            size="large"
-            onPress={handleCommitSession}
-            enableHaptics={true}
-          />
-          <Text style={styles.modernButtonLabel}>Delete Marked Items</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleCommitSession}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={THEME_COLORS.DANGER_GRADIENT}
+            style={styles.buttonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons
+              name="trash"
+              size={20}
+              color={THEME_COLORS.WHITE}
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.deleteButtonText}>Delete Marked Items</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       )}
-      
+
       <TouchableOpacity
         style={styles.button}
         onPress={() => {
@@ -485,34 +501,40 @@ const LocalOrganizeScreen: React.FC = () => {
       {/* Progress indicator */}
       <View style={styles.progressOverlay}>
         <View style={styles.progressBar}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
+              styles.progressFill,
               { width: `${((currentIndex + 1) / cachedMediaItems.length) * 100}%` }
-            ]} 
+            ]}
           />
         </View>
       </View>
 
-      {/* Action Buttons - Fixed position above cards */}
-      {(canUndo || true) && (
-        <View style={styles.actionButtonsContainer}>
-          {canUndo && (
-            <ModernActionButton
-              variant="undo"
-              size="medium"
-              onPress={handleUndo}
-              enableHaptics={true}
-            />
-          )}
-          <ModernActionButton
-            variant="commit"
-            size="medium"
-            onPress={handleCommitSession}
-            enableHaptics={true}
-          />
-        </View>
-      )}
+      {/* Action Buttons - Simple text buttons */}
+      <View style={styles.actionButtonsContainer}>
+        {canUndo && (
+          <TouchableOpacity
+            style={styles.simpleUndoButton}
+            onPress={handleUndo}
+            activeOpacity={0.7}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons name="arrow-undo" size={18} color="#333" />
+              <Text style={styles.simpleUndoButtonText}>Undo</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.simpleCommitButton}
+          onPress={handleCommitSession}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonContent}>
+            <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+            <Text style={styles.simpleCommitButtonText}>Commit</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* Swipe Card Stack */}
       <View style={styles.cardContainer}>
@@ -603,9 +625,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginVertical: 8,
   },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-  },
+
   buttonText: {
     color: '#fff',
     fontSize: 16,
@@ -644,32 +664,69 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     gap: 20,
   },
-  actionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+  simpleUndoButton: {
+    backgroundColor: '#E9ECEF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  undoButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  simpleCommitButton: {
+    backgroundColor: '#46A575',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  commitButton: {
-    backgroundColor: 'rgba(52, 199, 89, 0.9)',
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  actionButtonIcon: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+  simpleUndoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
+  simpleCommitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  deleteButton: {
+    borderRadius: BORDER_RADIUS.LG,
+    overflow: 'hidden',
+    ...SHADOWS.BUTTON,
+    marginVertical: 16,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
+  },
+  buttonIcon: {
+    marginRight: SPACING.XS,
+  },
+  deleteButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: THEME_COLORS.WHITE,
+  },
+
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -712,17 +769,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
-  modernButtonContainer: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  modernButtonLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginTop: 8,
-    textAlign: 'center',
-  },
+
 });
 
 export default LocalOrganizeScreen;

@@ -8,7 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Modal,
   Animated,
   Dimensions,
@@ -16,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { THEME_COLORS, SPACING, TEXT_STYLES, SHADOWS, BORDER_RADIUS } from '@/theme';
+import EnhancedButton from './EnhancedButton';
 
 interface PermissionBenefit {
   icon: string;
@@ -158,35 +158,26 @@ const PermissionRequestDialog: React.FC<PermissionRequestDialogProps> = ({
             )}
             
             <View style={styles.buttons}>
-              <TouchableOpacity
-                style={[styles.primaryButton, isLoading && styles.disabledButton]}
+              <EnhancedButton
+                title={isLoading ? 'Processing...' : allowButtonText}
                 onPress={handleAllow}
+                variant="primary"
+                size="large"
                 disabled={isLoading}
-              >
-                <LinearGradient
-                  colors={gradientColors}
-                  style={styles.buttonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  {isLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color={THEME_COLORS.WHITE} />
-                      <Text style={styles.loadingText}>Processing...</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.primaryButtonText}>{allowButtonText}</Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
+                loading={isLoading}
+                fullWidth
+                style={styles.primaryButton}
+              />
               
-              <TouchableOpacity
-                style={styles.secondaryButton}
+              <EnhancedButton
+                title={denyButtonText}
                 onPress={handleDeny}
+                variant="minimal"
+                size="large"
                 disabled={isLoading}
-              >
-                <Text style={styles.secondaryButtonText}>{denyButtonText}</Text>
-              </TouchableOpacity>
+                fullWidth
+                style={styles.secondaryButton}
+              />
             </View>
           </View>
         </Animated.View>

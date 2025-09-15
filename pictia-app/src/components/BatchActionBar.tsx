@@ -6,9 +6,14 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CachedMediaItem } from '@/types';
+import { THEME_COLORS } from '@/theme/colors';
+import { SHADOWS } from '@/theme/shadows';
+import { SPACING, BORDER_RADIUS } from '@/theme/spacing';
 
 interface BatchActionBarProps {
   selectedItems: CachedMediaItem[];
@@ -81,6 +86,104 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
     );
   };
 
+  // Modern button component for batch actions
+  const ModernBatchButton: React.FC<{
+    onPress: () => void;
+    disabled?: boolean;
+    variant: 'primary' | 'danger' | 'warning';
+    icon: string;
+    text: string;
+  }> = ({ onPress, disabled = false, variant, icon, text }) => {
+    const scaleAnim = React.useRef(new Animated.Value(1)).current;
+
+    const getVariantStyles = () => {
+      switch (variant) {
+        case 'danger':
+          return {
+            gradient: THEME_COLORS.DANGER_GRADIENT,
+            backgroundColor: THEME_COLORS.DANGER,
+            iconColor: THEME_COLORS.WHITE,
+            textColor: THEME_COLORS.WHITE,
+          };
+        case 'warning':
+          return {
+            gradient: ['#FFA200', '#FF8C00'] as const,
+            backgroundColor: THEME_COLORS.WARNING,
+            iconColor: THEME_COLORS.WHITE,
+            textColor: THEME_COLORS.WHITE,
+          };
+        default:
+          return {
+            gradient: THEME_COLORS.PRIMARY_GRADIENT,
+            backgroundColor: THEME_COLORS.PRIMARY,
+            iconColor: THEME_COLORS.WHITE,
+            textColor: THEME_COLORS.WHITE,
+          };
+      }
+    };
+
+    const variantStyles = getVariantStyles();
+
+    const handlePressIn = () => {
+      if (disabled) return;
+      Animated.spring(scaleAnim, {
+        toValue: 0.95,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    };
+
+    const handlePressOut = () => {
+      if (disabled) return;
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }).start();
+    };
+
+    return (
+      <Animated.View
+        style={[
+          { transform: [{ scale: scaleAnim }] },
+          disabled && { opacity: 0.5 },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.modernButton, disabled && styles.disabledButton]}
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          disabled={disabled}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={disabled ? ['#999', '#777'] : variantStyles.gradient}
+            style={styles.modernButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Ionicons
+              name={icon as any}
+              size={18}
+              color={disabled ? '#ccc' : variantStyles.iconColor}
+            />
+            <Text
+              style={[
+                styles.modernButtonText,
+                { color: disabled ? '#ccc' : variantStyles.textColor },
+              ]}
+            >
+              {text}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   if (!isVisible) {
     return null;
   }
@@ -90,8 +193,12 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
       <View style={styles.content}>
         {/* Left section - Cancel and selection info */}
         <View style={styles.leftSection}>
-          <TouchableOpacity style={styles.cancelButton} onPress={onCancel}>
-            <Ionicons name="close" size={24} color="#007AFF" />
+          <TouchableOpacity 
+            style={styles.cancelButton} 
+            onPress={onCancel}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={20} color={THEME_COLORS.PRIMARY} />
           </TouchableOpacity>
           
           <Text style={styles.selectionText}>
@@ -103,74 +210,33 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
         <View style={styles.rightSection}>
           {/* Select/Deselect All */}
           {(onSelectAll || onDeselectAll) && (
-            <TouchableOpacity
-              style={styles.actionButton}
+            <ModernBatchButton
               onPress={handleSelectToggle}
-            >
-              <Ionicons
-                name={allSelected ? "checkbox" : "checkbox-outline"}
-                size={24}
-                color="#007AFF"
-              />
-              <Text style={styles.actionText}>
-                {allSelected ? 'Deselect All' : 'Select All'}
-              </Text>
-            </TouchableOpacity>
+              variant="primary"
+              icon={allSelected ? "checkbox" : "checkbox-outline"}
+              text={allSelected ? 'Deselect All' : 'Select All'}
+            />
           )}
 
           {/* Mark as Unreviewed button */}
           {onMarkAsUnreviewed && (
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.unreviewedButton,
-                selectedCount === 0 && styles.disabledButton,
-              ]}
+            <ModernBatchButton
               onPress={handleMarkAsUnreviewed}
               disabled={selectedCount === 0}
-            >
-              <Ionicons
-                name="refresh"
-                size={24}
-                color={selectedCount === 0 ? '#999' : '#FF9500'}
-              />
-              <Text
-                style={[
-                  styles.actionText,
-                  styles.unreviewedText,
-                  selectedCount === 0 && styles.disabledText,
-                ]}
-              >
-                Unreviewed
-              </Text>
-            </TouchableOpacity>
+              variant="warning"
+              icon="refresh"
+              text="Unreviewed"
+            />
           )}
 
           {/* Delete button */}
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.deleteButton,
-              selectedCount === 0 && styles.disabledButton,
-            ]}
+          <ModernBatchButton
             onPress={handleDelete}
             disabled={selectedCount === 0}
-          >
-            <Ionicons
-              name="trash"
-              size={24}
-              color={selectedCount === 0 ? '#999' : '#FF3B30'}
-            />
-            <Text
-              style={[
-                styles.actionText,
-                styles.deleteText,
-                selectedCount === 0 && styles.disabledText,
-              ]}
-            >
-              Delete
-            </Text>
-          </TouchableOpacity>
+            variant="danger"
+            icon="trash"
+            text="Delete"
+          />
         </View>
       </View>
     </SafeAreaView>
@@ -183,17 +249,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5E7',
+    backgroundColor: THEME_COLORS.WHITE,
+    borderTopWidth: 0,
     zIndex: 1000,
+    ...SHADOWS.TAB_BAR,
   },
   content: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
     minHeight: 60,
   },
   leftSection: {
@@ -202,19 +268,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cancelButton: {
-    padding: 8,
-    marginRight: 12,
+    padding: SPACING.SM,
+    marginRight: SPACING.SM,
+    borderRadius: BORDER_RADIUS.SM,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
   selectionText: {
     fontSize: 16,
-    color: '#333',
+    color: THEME_COLORS.TEXT_PRIMARY,
     fontWeight: '500',
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: SPACING.SM,
   },
+  modernButton: {
+    borderRadius: BORDER_RADIUS.MD,
+    overflow: 'hidden',
+    ...SHADOWS.BUTTON,
+  },
+  modernButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.SM,
+    paddingVertical: SPACING.SM,
+    gap: 6,
+  },
+  modernButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  // Legacy styles (keeping for compatibility)
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -229,9 +317,6 @@ const styles = StyleSheet.create({
   },
   unreviewedButton: {
     backgroundColor: 'rgba(255, 149, 0, 0.1)',
-  },
-  disabledButton: {
-    backgroundColor: 'rgba(153, 153, 153, 0.1)',
   },
   actionText: {
     fontSize: 14,

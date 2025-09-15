@@ -1,0 +1,52 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#f8f9ff;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="180" fill="url(#bgGradient)"/>
+  
+  <!-- Photo card stack effect -->
+  <g transform="translate(512, 512)">
+    <!-- Back card (slightly rotated) -->
+    <rect x="-140" y="-180" width="280" height="200" rx="20" fill="rgba(255,255,255,0.3)" transform="rotate(-8)"/>
+    
+    <!-- Middle card -->
+    <rect x="-150" y="-190" width="300" height="220" rx="24" fill="rgba(255,255,255,0.6)" transform="rotate(-3)"/>
+    
+    <!-- Front card (main photo) -->
+    <rect x="-160" y="-200" width="320" height="240" rx="28" fill="url(#cardGradient)" stroke="rgba(255,255,255,0.8)" stroke-width="2"/>
+    
+    <!-- Photo placeholder (mountain icon) -->
+    <g transform="translate(0, -80)">
+      <!-- Mountain silhouette -->
+      <path d="M-80 40 L-40 -20 L-10 10 L20 -30 L80 40 Z" fill="#667eea" opacity="0.7"/>
+      <!-- Sun -->
+      <circle cx="40" cy="-10" r="18" fill="#ffd700" opacity="0.8"/>
+    </g>
+    
+    <!-- Swipe indicators -->
+    <!-- Left swipe (delete) -->
+    <g transform="translate(-200, 0)" opacity="0.6">
+      <circle r="30" fill="#ff4757"/>
+      <path d="M-8 -8 L8 8 M8 -8 L-8 8" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Right swipe (keep) -->
+    <g transform="translate(200, 0)" opacity="0.6">
+      <circle r="30" fill="#2ed573"/>
+      <path d="M-10 0 L-2 8 L10 -8" stroke="white" stroke-width="4" stroke-linecap="round" fill="none"/>
+    </g>
+    
+    <!-- App name initial -->
+    <text x="0" y="140" text-anchor="middle" font-family="SF Pro Display, -apple-system, sans-serif" font-size="120" font-weight="700" fill="white" opacity="0.9">P</text>
+  </g>
+</svg>
