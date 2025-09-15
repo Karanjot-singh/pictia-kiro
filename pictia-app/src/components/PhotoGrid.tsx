@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingTop: GRID_SPACING,
-    paddingBottom: GRID_SPACING,
+    paddingBottom: 100, // Add extra padding to avoid overlap with bottom navigation
   },
   row: {
     justifyContent: 'space-between',

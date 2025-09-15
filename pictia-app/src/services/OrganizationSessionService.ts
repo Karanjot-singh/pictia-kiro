@@ -154,13 +154,15 @@ class OrganizationSessionService {
         (sum, session) => sum + ((session.endTime || session.startTime) - session.startTime), 0
       );
 
+      const lastSessionDate = completedSessions[0]?.endTime || completedSessions[0]?.startTime;
+      
       return {
         totalSessions: completedSessions.length,
         totalPhotosProcessed,
         totalPhotosKept,
         totalPhotosDeleted,
         averageSessionDuration: totalDuration / completedSessions.length,
-        lastSessionDate: completedSessions[0]?.endTime || completedSessions[0]?.startTime,
+        ...(lastSessionDate && { lastSessionDate }),
       };
     } catch (error) {
       console.error('Failed to get session statistics:', error);

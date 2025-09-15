@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '../components';
 import { useNavigationGuard } from '../hooks/useNavigationGuard';
 import { RootState } from '../store';
@@ -24,15 +24,24 @@ import {
   selectCurrentSession,
   selectHasUnsavedChanges,
   selectSessionStats,
+  selectCompletionStatus,
   commitOrganizationSession,
   discardOrganizationSession,
   startOrganizationSession,
   restoreSessionProgress,
   resetOrganization,
+  setFilteredMediaItems,
+  updateFilteredMediaItems,
+  setCompletionStatus,
+  setHasMorePhotosAvailable,
+  setTotalAvailableItems,
+  resetCompletionTracking,
+  checkCompletionStatus,
 } from '../store/slices/organizationSlice';
 import { useGetMediaItemsQuery } from '../store/api/googlePhotosApi';
 import { CachedMediaItem, SwipeAction, OrganiseStackParamList } from '../types';
 import OrganizationSessionService from '../services/OrganizationSessionService';
+import ReviewTracker from '../services/ReviewTracker';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -64,6 +73,7 @@ const OrganizeScreen: React.FC = () => {
   const currentSession = useSelector(selectCurrentSession);
   const hasUnsavedChanges = useSelector(selectHasUnsavedChanges);
   const sessionStats = useSelector(selectSessionStats);
+  const completionStatus = useSelector(selectCompletionStatus);
   
   // API query
   const {
@@ -86,6 +96,41 @@ const OrganizeScreen: React.FC = () => {
   useEffect(() => {
     initializeOrganization();
   }, []);
+
+  // Re-filter photos when screen comes into focus (e.g., returning from gallery after commit)
+  useFocusEffect(
+    React.useCallback(() => {
+      const refilterPhotos = async () => {
+        if (startMode === 'natural' && mediaData?.items && isInitialized) {
+          const reviewTracker = ReviewTracker.getInstance();
+          await reviewTracker.initialize();
+          
+          // Refresh the unreviewed queue with latest data
+          await reviewTracker.refreshUnreviewedQueue(mediaData.items);
+          const filteredMediaItems = await reviewTracker.getUnreviewedQueue();
+          
+          // Use intelligent completion checking - this will handle the completion status properly
+          dispatch(checkCompletionStatus({
+            hasUnreviewedPhotos: filteredMediaItems.length > 0,
+            canLoadMore: organizationState.hasMorePhotosAvailable,
+          }));
+          
+          // Always update filtered media items to ensure fresh data
+          dispatch(setFilteredMediaItems(filteredMediaItems));
+          
+          // Reset current index if we're at or past the end of filtered items
+          if (organizationState.currentIndex >= filteredMediaItems.length && filteredMediaItems.length > 0) {
+            dispatch(startOrganizationSession({
+              startMode,
+              ...(startingPhotoId && { startingPhotoId }),
+            }));
+          }
+        }
+      };
+
+      refilterPhotos();
+    }, [startMode, mediaData, isInitialized, dispatch, startingPhotoId, organizationState.hasMorePhotosAvailable])
+  );
 
   // Save decisions to AsyncStorage whenever they change
   useEffect(() => {
@@ -111,6 +156,10 @@ const OrganizeScreen: React.FC = () => {
 
   const initializeOrganization = async () => {
     try {
+      // Initialize review tracker
+      const reviewTracker = ReviewTracker.getInstance();
+      await reviewTracker.initialize();
+      
       // Load saved organization decisions
       const savedDecisions = await loadOrganizationDecisions();
       
@@ -130,6 +179,52 @@ const OrganizeScreen: React.FC = () => {
         // Clear any expired session
         if (existingSession) {
           await OrganizationSessionService.clearCurrentSession();
+        }
+        
+        // Set up pagination and total information
+        if (mediaData?.items) {
+          const totalAvailable = mediaData.totalCount || mediaData.items.length;
+          const hasMore = !!mediaData.nextPageToken;
+          
+          dispatch(setTotalAvailableItems(totalAvailable));
+          dispatch(setHasMorePhotosAvailable(hasMore));
+          
+          // Filter out reviewed photos for natural mode
+          if (startMode === 'natural') {
+            await reviewTracker.refreshUnreviewedQueue(mediaData.items);
+            const filteredMediaItems = await reviewTracker.getUnreviewedQueue();
+            
+            // Use intelligent completion checking
+            dispatch(checkCompletionStatus({
+              hasUnreviewedPhotos: filteredMediaItems.length > 0,
+              canLoadMore: hasMore,
+              isInitialLoad: true,
+            }));
+            
+            if (filteredMediaItems.length === 0) {
+              if (hasMore) {
+                // TODO: Implement loading more photos here
+                Alert.alert(
+                  'Batch Complete',
+                  'You have reviewed all photos in this batch. Loading more photos...',
+                  [{ text: 'OK' }]
+                );
+              } else {
+                Alert.alert(
+                  'All Photos Reviewed',
+                  'You have already reviewed all available photos. Great job!',
+                  [{ text: 'OK', onPress: () => setIsInitialized(true) }]
+                );
+              }
+              return;
+            }
+            
+            // Set filtered media items for natural mode
+            dispatch(setFilteredMediaItems(filteredMediaItems));
+          } else {
+            // For gallery mode, use all items
+            dispatch(setFilteredMediaItems(mediaData.items));
+          }
         }
         
         // Start a new session with the provided parameters
@@ -180,17 +275,97 @@ const OrganizeScreen: React.FC = () => {
   };
 
   const handleSwipeLeft = (item: CachedMediaItem) => {
+    if (!item || !item.id) {
+      console.warn('Invalid item passed to handleSwipeLeft');
+      return;
+    }
+
     dispatch(swipeAction({ item, action: 'delete' }));
-    // Session progress will be automatically saved via useEffect
+    
+    // Mark as reviewed immediately for real-time filtering (non-blocking)
+    setTimeout(async () => {
+      try {
+        const reviewTracker = ReviewTracker.getInstance();
+        await reviewTracker.markAsReviewed(item.id, 'delete', currentSession?.id);
+        
+        // Update filtered media items in real-time for natural mode
+        if (startMode === 'natural') {
+          const updatedQueue = await reviewTracker.getUnreviewedQueue();
+          dispatch(updateFilteredMediaItems(updatedQueue));
+          
+          // Intelligent completion check
+          dispatch(checkCompletionStatus({
+            hasUnreviewedPhotos: updatedQueue.length > 0,
+            canLoadMore: organizationState.hasMorePhotosAvailable,
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to mark item as reviewed:', error);
+      }
+    }, 0);
   };
 
   const handleSwipeRight = (item: CachedMediaItem) => {
+    if (!item || !item.id) {
+      console.warn('Invalid item passed to handleSwipeRight');
+      return;
+    }
+
     dispatch(swipeAction({ item, action: 'keep' }));
-    // Session progress will be automatically saved via useEffect
+    
+    // Mark as reviewed immediately for real-time filtering (non-blocking)
+    setTimeout(async () => {
+      try {
+        const reviewTracker = ReviewTracker.getInstance();
+        await reviewTracker.markAsReviewed(item.id, 'keep', currentSession?.id);
+        
+        // Update filtered media items in real-time for natural mode
+        if (startMode === 'natural') {
+          const updatedQueue = await reviewTracker.getUnreviewedQueue();
+          dispatch(updateFilteredMediaItems(updatedQueue));
+          
+          // Intelligent completion check
+          dispatch(checkCompletionStatus({
+            hasUnreviewedPhotos: updatedQueue.length > 0,
+            canLoadMore: organizationState.hasMorePhotosAvailable,
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to mark item as reviewed:', error);
+      }
+    }, 0);
   };
 
   const handleUndo = () => {
+    // Get the last action before undoing
+    const lastAction = organizationState.undoStack[organizationState.undoStack.length - 1];
+    
     dispatch(undoLastAction());
+    
+    // Remove the review status for the undone item and refresh queue (non-blocking)
+    if (lastAction) {
+      setTimeout(async () => {
+        try {
+          const reviewTracker = ReviewTracker.getInstance();
+          await reviewTracker.removeReviewStatus(lastAction.mediaItemId);
+          
+          // Refresh the queue for natural mode
+          if (startMode === 'natural' && mediaData?.items) {
+            await reviewTracker.refreshUnreviewedQueue(mediaData.items);
+            const updatedQueue = await reviewTracker.getUnreviewedQueue();
+            dispatch(updateFilteredMediaItems(updatedQueue));
+            
+            // Intelligent completion check after undo
+            dispatch(checkCompletionStatus({
+              hasUnreviewedPhotos: updatedQueue.length > 0,
+              canLoadMore: organizationState.hasMorePhotosAvailable,
+            }));
+          }
+        } catch (error) {
+          console.error('Failed to remove review status during undo:', error);
+        }
+      }, 0);
+    }
   };
 
   const handleResetOrganization = () => {
@@ -225,6 +400,55 @@ const OrganizeScreen: React.FC = () => {
 
     setIsCommittingSession(true);
     try {
+      const reviewTracker = ReviewTracker.getInstance();
+      
+      // Count photos marked for deletion
+      const deleteActions = currentSession.pendingActions.filter(action => action.action === 'delete');
+      const keepActions = currentSession.pendingActions.filter(action => action.action === 'keep');
+      
+      // Mark all photos that were seen but not acted upon as reviewed (keep action)
+      // Include the current photo being viewed even if no action was taken
+      const seenPhotoIds = new Set<string>();
+      const maxIndex = Math.max(organizationState.currentIndex, 0);
+      for (let i = 0; i <= maxIndex && i < organizationState.mediaItems.length; i++) {
+        const item = organizationState.mediaItems[i];
+        if (item) {
+          seenPhotoIds.add(item.id);
+        }
+      }
+      
+      // Remove photos that already have actions
+      const actionedPhotoIds = new Set(currentSession.pendingActions.map(action => action.mediaItemId));
+      const viewedButNotActionedPhotoIds = Array.from(seenPhotoIds).filter(id => !actionedPhotoIds.has(id));
+      
+      // Check if there's anything to commit (either explicit actions or viewed photos)
+      const totalToProcess = currentSession.pendingActions.length + viewedButNotActionedPhotoIds.length;
+      
+      // Allow commit even if no explicit actions were taken, as long as photos were viewed
+      if (totalToProcess === 0 && seenPhotoIds.size === 0) {
+        Alert.alert(
+          'Nothing to Commit',
+          'No photos have been viewed in this session yet.',
+          [{ text: 'OK' }]
+        );
+        setIsCommittingSession(false);
+        return;
+      }
+      
+      // Mark all photos in the session as reviewed with their actions
+      for (const action of currentSession.pendingActions) {
+        await reviewTracker.markAsReviewed(
+          action.mediaItemId,
+          action.action,
+          currentSession.id
+        );
+      }
+      
+      // Mark viewed but not actioned photos as reviewed with 'keep' action
+      for (const photoId of viewedButNotActionedPhotoIds) {
+        await reviewTracker.markAsReviewed(photoId, 'keep', currentSession.id);
+      }
+      
       // Commit the session in Redux
       dispatch(commitOrganizationSession());
       
@@ -233,7 +457,7 @@ const OrganizeScreen: React.FC = () => {
         ...currentSession,
         endTime: Date.now(),
         isCommitted: true,
-        processedItems: currentSession.pendingActions.length,
+        processedItems: totalToProcess,
       };
       await OrganizationSessionService.saveToHistory(finalSession);
       
@@ -241,6 +465,23 @@ const OrganizeScreen: React.FC = () => {
       await OrganizationSessionService.clearCurrentSession();
       
       setShowSessionExitModal(false);
+      
+      // Show completion message
+      const totalKept = keepActions.length + viewedButNotActionedPhotoIds.length;
+      
+      if (deleteActions.length > 0) {
+        Alert.alert(
+          'Session Committed',
+          `Successfully organized ${totalToProcess} photos:\n• ${totalKept} kept\n• ${deleteActions.length} marked for deletion\n\nNote: Photos marked for deletion are hidden from the gallery but remain in your Google Photos. Use Google Photos directly to permanently delete them if desired.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Session Committed',
+          `Successfully organized ${totalToProcess} photos. All viewed photos are now marked as reviewed.`,
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       console.error('Failed to commit session:', error);
       Alert.alert('Error', 'Failed to save session. Please try again.');
@@ -269,17 +510,35 @@ const OrganizeScreen: React.FC = () => {
 
   const renderProgressIndicator = () => (
     <View style={styles.progressContainer}>
+      {/* Current batch progress */}
       <Text style={styles.progressText}>
-        {progress.current} of {progress.total} photos
+        {progress.current} of {progress.total} photos in current batch
       </Text>
       <View style={styles.progressBar}>
         <View 
           style={[
             styles.progressFill, 
-            { width: `${progress.percentage}%` }
+            { width: `${progress.batchPercentage}%` }
           ]} 
         />
       </View>
+      
+      {/* Overall session progress */}
+      {progress.isNaturalMode && progress.overallTotal > 0 && (
+        <>
+          <Text style={styles.overallProgressText}>
+            Session: {progress.processed} of {progress.overallTotal} photos reviewed ({Math.round(progress.percentage)}%)
+          </Text>
+          <View style={styles.overallProgressBar}>
+            <View 
+              style={[
+                styles.overallProgressFill, 
+                { width: `${progress.percentage}%` }
+              ]} 
+            />
+          </View>
+        </>
+      )}
       
       {/* Session Statistics */}
       {sessionStats && (
@@ -297,20 +556,74 @@ const OrganizeScreen: React.FC = () => {
     </View>
   );
 
-  const renderCompletionScreen = () => (
-    <View style={styles.completionContainer}>
-      <Text style={styles.completionTitle}>Organization Complete!</Text>
-      <Text style={styles.completionText}>
-        You've organized {progress.total} photos
-      </Text>
-      <Text style={styles.completionStats}>
-        Kept: {organizationState.processingStats.keepCount} photos{'\n'}
-        Deleted: {organizationState.processingStats.deleteCount} photos
-      </Text>
-      
-      {/* Here you could add buttons for backup, export, etc. */}
-    </View>
-  );
+  const renderCompletionScreen = () => {
+    const { status, hasMorePhotosAvailable, isLoading } = completionStatus;
+    
+    // Loading state for checking more photos
+    if (isLoading) {
+      return (
+        <View style={styles.completionContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.completionTitle}>
+            {status === 'checking_more' ? 'Checking for more photos...' : 'Loading more photos...'}
+          </Text>
+          <Text style={styles.completionText}>
+            Please wait while we check for additional photos to organize.
+          </Text>
+        </View>
+      );
+    }
+    
+    // Batch complete but more photos available
+    if (status === 'batch_complete' && hasMorePhotosAvailable) {
+      return (
+        <View style={styles.completionContainer}>
+          <Text style={styles.completionTitle}>Batch Complete!</Text>
+          <Text style={styles.completionText}>
+            You've organized {progress.processed} photos in this session
+          </Text>
+          <Text style={styles.completionStats}>
+            Kept: {organizationState.processingStats.keepCount} photos{'\n'}
+            Deleted: {organizationState.processingStats.deleteCount} photos
+          </Text>
+          <TouchableOpacity
+            style={styles.loadMoreButton}
+            onPress={() => {
+              // TODO: Implement load more functionality
+              Alert.alert('Load More', 'Loading more photos functionality will be implemented here.');
+            }}
+          >
+            <Text style={styles.loadMoreButtonText}>Load More Photos</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    // All photos complete
+    return (
+      <View style={styles.completionContainer}>
+        <Text style={styles.completionTitle}>Organization Complete!</Text>
+        <Text style={styles.completionText}>
+          You've organized {progress.processed} photos
+          {progress.overallTotal > progress.processed && ` out of ${progress.overallTotal} total`}
+        </Text>
+        <Text style={styles.completionStats}>
+          Kept: {organizationState.processingStats.keepCount} photos{'\n'}
+          Deleted: {organizationState.processingStats.deleteCount} photos
+        </Text>
+        
+        <TouchableOpacity
+          style={styles.startOverButton}
+          onPress={() => {
+            dispatch(resetCompletionTracking());
+            dispatch(resetOrganization());
+          }}
+        >
+          <Text style={styles.startOverButtonText}>Start Over</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderLoadingScreen = () => (
     <View style={styles.loadingContainer}>
@@ -363,8 +676,8 @@ const OrganizeScreen: React.FC = () => {
     );
   }
 
-  // Completion state
-  if (progress.current >= progress.total) {
+  // Completion state - use the new robust completion detection
+  if (completionStatus.isBatchComplete || completionStatus.isComplete) {
     return (
       <SafeAreaView style={styles.container}>
         {renderCompletionScreen()}
@@ -386,28 +699,10 @@ const OrganizeScreen: React.FC = () => {
           onUndo={handleUndo}
           onCommit={handleCommitSession}
           canUndo={canUndo}
-          canCommit={hasUnsavedChanges}
+          canCommit={true}
           undoTimeoutMs={5000}
           actionBarPosition="bottom"
         />
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => currentMediaItem && handleSwipeLeft(currentMediaItem)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionButtonText}>Delete</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.keepButton]}
-          onPress={() => currentMediaItem && handleSwipeRight(currentMediaItem)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionButtonText}>Keep</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Session Exit Modal */}
@@ -473,41 +768,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    justifyContent: 'space-between',
-    gap: 16,
+  keepColor: {
+    color: '#34C759',
   },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-  },
-  keepButton: {
-    backgroundColor: '#34C759',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  deleteColor: {
+    color: '#FF3B30',
   },
   loadingContainer: {
     flex: 1,
@@ -586,6 +851,48 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  overallProgressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  overallProgressBar: {
+    height: 3,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 1.5,
+    marginBottom: 8,
+  },
+  overallProgressFill: {
+    height: '100%',
+    backgroundColor: '#34C759',
+    borderRadius: 1.5,
+  },
+  loadMoreButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 24,
+  },
+  loadMoreButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  startOverButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 24,
+  },
+  startOverButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

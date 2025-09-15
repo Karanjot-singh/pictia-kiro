@@ -9,6 +9,8 @@ export { BackupLogger } from './BackupLogger';
 export { SettingsService } from './SettingsService';
 export { default as ReviewTracker } from './ReviewTracker';
 export { default as OrganizationSessionService } from './OrganizationSessionService';
+export { default as DebugService } from './DebugService';
+export { default as ConfigValidator } from './ConfigValidator';
 export type { 
   NotificationConfig, 
   BackupReminder, 

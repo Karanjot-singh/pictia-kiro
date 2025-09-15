@@ -212,6 +212,13 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({ navigation }) => {
       showInLocalMode: true,
     },
     {
+      title: 'Debug Tools',
+      description: 'Developer tools for testing and debugging',
+      onPress: () => navigation.navigate('Debug'),
+      icon: '🔧',
+      showInLocalMode: true,
+    },
+    {
       title: 'About',
       description: 'App version and information',
       onPress: () => {

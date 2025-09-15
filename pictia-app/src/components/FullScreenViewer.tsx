@@ -11,16 +11,10 @@ import {
   Alert,
 } from 'react-native';
 import {
-  PinchGestureHandler,
-  PanGestureHandler,
-  TapGestureHandler,
-  State,
-  PinchGestureHandlerGestureEvent,
-  PanGestureHandlerGestureEvent,
-  TapGestureHandlerGestureEvent,
+  Gesture,
+  GestureDetector,
 } from 'react-native-gesture-handler';
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -64,11 +58,6 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
   const focalX = useSharedValue(0);
   const focalY = useSharedValue(0);
 
-  // Refs for gesture handlers
-  const pinchRef = useRef(null);
-  const panRef = useRef(null);
-  const tapRef = useRef(null);
-
   // Calculate image display dimensions
   const getImageDisplaySize = useCallback(() => {
     if (!imageLoaded || !imageDimensions.width || !imageDimensions.height) {
@@ -93,6 +82,31 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
     return { width: displayWidth, height: displayHeight };
   }, [imageLoaded, imageDimensions]);
 
+  // Worklet version of getImageDisplaySize for use in gestures
+  const getImageDisplaySizeWorklet = () => {
+    'worklet';
+    if (!imageLoaded || !imageDimensions.width || !imageDimensions.height) {
+      return { width: screenWidth, height: screenHeight };
+    }
+
+    const imageAspectRatio = imageDimensions.width / imageDimensions.height;
+    const screenAspectRatio = screenWidth / screenHeight;
+
+    let displayWidth, displayHeight;
+
+    if (imageAspectRatio > screenAspectRatio) {
+      // Image is wider than screen
+      displayWidth = screenWidth;
+      displayHeight = screenWidth / imageAspectRatio;
+    } else {
+      // Image is taller than screen
+      displayHeight = screenHeight;
+      displayWidth = screenHeight * imageAspectRatio;
+    }
+
+    return { width: displayWidth, height: displayHeight };
+  };
+
   // Reset zoom and pan
   const resetTransform = useCallback(() => {
     scale.value = withSpring(1);
@@ -105,42 +119,38 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
     setShowControls(prev => !prev);
   }, []);
 
-  // Pinch gesture handler
-  const pinchGestureHandler = useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
-    onStart: (_, context: any) => {
-      context.startScale = scale.value;
-    },
-    onActive: (event, context: any) => {
-      const newScale = (context.startScale as number) * event.scale;
+  // Pinch gesture
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      'worklet';
+      const newScale = event.scale;
       scale.value = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
       
       focalX.value = event.focalX;
       focalY.value = event.focalY;
-    },
-    onEnd: () => {
+    })
+    .onEnd(() => {
+      'worklet';
       if (scale.value < MIN_SCALE) {
         scale.value = withSpring(MIN_SCALE);
         translateX.value = withSpring(0);
         translateY.value = withSpring(0);
       }
-    },
-  });
+    });
 
-  // Pan gesture handler
-  const panGestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-    onStart: (_, context: any) => {
-      context.startX = translateX.value;
-      context.startY = translateY.value;
-    },
-    onActive: (event, context: any) => {
+  // Pan gesture
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      'worklet';
       if (scale.value > 1) {
-        translateX.value = (context.startX as number) + event.translationX;
-        translateY.value = (context.startY as number) + event.translationY;
+        translateX.value = event.translationX;
+        translateY.value = event.translationY;
       }
-    },
-    onEnd: () => {
+    })
+    .onEnd(() => {
+      'worklet';
       // Constrain pan to image boundaries
-      const displaySize = getImageDisplaySize();
+      const displaySize = getImageDisplaySizeWorklet();
       const maxTranslateX = (displaySize.width * scale.value - screenWidth) / 2;
       const maxTranslateY = (displaySize.height * scale.value - screenHeight) / 2;
 
@@ -150,19 +160,21 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
       if (Math.abs(translateY.value) > maxTranslateY) {
         translateY.value = withSpring(Math.sign(translateY.value) * maxTranslateY);
       }
-    },
-  });
+    });
 
-  // Tap gesture handler
-  const tapGestureHandler = useAnimatedGestureHandler<TapGestureHandlerGestureEvent>({
-    onEnd: () => {
+  // Single tap gesture
+  const singleTapGesture = Gesture.Tap()
+    .numberOfTaps(1)
+    .onEnd(() => {
+      'worklet';
       runOnJS(toggleControls)();
-    },
-  });
+    });
 
-  // Double tap to zoom
-  const doubleTapGestureHandler = useAnimatedGestureHandler<TapGestureHandlerGestureEvent>({
-    onEnd: (event) => {
+  // Double tap gesture
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd((event) => {
+      'worklet';
       if (scale.value > 1) {
         // Zoom out
         scale.value = withSpring(1);
@@ -174,15 +186,19 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
         scale.value = withSpring(newScale);
         
         // Calculate translation to center on tap point
-        const displaySize = getImageDisplaySize();
         const tapX = event.x - screenWidth / 2;
         const tapY = event.y - screenHeight / 2;
         
         translateX.value = withSpring(-tapX * (newScale - 1));
         translateY.value = withSpring(-tapY * (newScale - 1));
       }
-    },
-  });
+    });
+
+  // Compose gestures
+  const composedGestures = Gesture.Simultaneous(
+    Gesture.Exclusive(doubleTapGesture, singleTapGesture),
+    Gesture.Simultaneous(pinchGesture, panGesture)
+  );
 
   // Animated style for the image
   const animatedImageStyle = useAnimatedStyle(() => {
@@ -233,52 +249,24 @@ const FullScreenViewer: React.FC<FullScreenViewerProps> = ({
       
       {/* Image container */}
       <View style={styles.imageContainer}>
-        <TapGestureHandler
-          ref={tapRef}
-          waitFor={[pinchRef]}
-          onGestureEvent={tapGestureHandler}
-          numberOfTaps={1}
-        >
+        <GestureDetector gesture={composedGestures}>
           <Animated.View style={styles.gestureContainer}>
-            <TapGestureHandler
-              onGestureEvent={doubleTapGestureHandler}
-              numberOfTaps={2}
-            >
-              <Animated.View>
-                <PinchGestureHandler
-                  ref={pinchRef}
-                  onGestureEvent={pinchGestureHandler}
-                  simultaneousHandlers={[panRef]}
-                >
-                  <Animated.View>
-                    <PanGestureHandler
-                      ref={panRef}
-                      onGestureEvent={panGestureHandler}
-                      simultaneousHandlers={[pinchRef]}
-                      minPointers={1}
-                      maxPointers={1}
-                    >
-                      <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
-                        <Image
-                          source={{ uri: highResUrl }}
-                          style={[
-                            styles.image,
-                            {
-                              width: displaySize.width,
-                              height: displaySize.height,
-                            },
-                          ]}
-                          resizeMode="contain"
-                          onLoad={handleImageLoad}
-                        />
-                      </Animated.View>
-                    </PanGestureHandler>
-                  </Animated.View>
-                </PinchGestureHandler>
-              </Animated.View>
-            </TapGestureHandler>
+            <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
+              <Image
+                source={{ uri: highResUrl }}
+                style={[
+                  styles.image,
+                  {
+                    width: displaySize.width,
+                    height: displaySize.height,
+                  },
+                ]}
+                resizeMode="contain"
+                onLoad={handleImageLoad}
+              />
+            </Animated.View>
           </Animated.View>
-        </TapGestureHandler>
+        </GestureDetector>
       </View>
 
       {/* Controls overlay */}

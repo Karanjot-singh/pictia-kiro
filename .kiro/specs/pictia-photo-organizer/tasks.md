@@ -259,6 +259,22 @@
     - Test photo review tracking to ensure reviewed photos are properly skipped
     - _Requirements: 3.1, 3.2, 3.4, 3.5, 3.6, 3.11_
 
+  - [x] 13.6 Implement comprehensive photo review tracking system
+    - Create persistent isReviewed flag for each photo that survives app restarts
+    - Mark photos as reviewed when Keep or Delete actions are taken and session is committed
+    - Ensure organize mode skips already reviewed photos and loads most recent unreviewed photo
+    - Add "Mark as Unreviewed" functionality in Gallery mode with kebab menu for batch operations
+    - Update gallery UI to reflect review status with visual indicators
+    - _Requirements: 2.6, 3.11, 3.8_
+
+  - [x] 13.7 Implement session commit with actual photo deletion and gallery sync
+    - Ensure photos marked as "delete" are actually deleted from Google Photos when session is committed
+    - Update gallery mode to reflect changes immediately after session commit (remove deleted photos)
+    - Implement proper error handling for deletion failures
+    - Add confirmation dialogs for destructive operations
+    - Sync review status and deletion status across all app components
+    - _Requirements: 3.6, 3.9, 3.10, 2.5_
+
 - [ ] 14. Configuration Validation and Developer Tools
   - [ ] 14.1 Create configuration validation system
     - Implement ConfigValidator class to check Google Cloud setup
@@ -267,9 +283,10 @@
     - Build configuration troubleshooting guide and error messages
     - _Requirements: 1.4, 9.1, 9.2_
 
-  - [ ] 14.2 Build development and debugging tools
+  - [x] 14.2 Build development and debugging tools
     - Create debug screens for testing API connectivity
     - Add developer mode with detailed logging and error information
+    - Add option to set all photos as reviewed / unreviewed for real time testing
     - Implement configuration export/import for team development
     - Create automated setup validation and environment checks
     - _Requirements: Developer configuration requirements_

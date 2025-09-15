@@ -20,6 +20,8 @@ interface OrganizationSession {
   }>;
 }
 
+type CompletionStatus = 'active' | 'batch_complete' | 'all_complete' | 'loading_more' | 'checking_more';
+
 interface OrganizationState {
   currentIndex: number;
   mediaItems: CachedMediaItem[];
@@ -44,6 +46,12 @@ interface OrganizationState {
     previousDecision?: SwipeAction | undefined;
     timestamp: number;
   }>;
+  // Enhanced completion tracking
+  originalTotalItems: number; // Total items when session started (before filtering)
+  totalAvailableItems: number; // Total items across all pages (for pagination)
+  completionStatus: CompletionStatus;
+  hasMorePhotosAvailable: boolean; // Whether more photos can be loaded via pagination
+  startMode: 'gallery' | 'natural'; // Track the current mode
   // Performance tracking
   lastUpdated: number;
   processingStats: {
@@ -75,6 +83,12 @@ const initialState: OrganizationState = {
   nextPageToken: undefined,
   cacheExpiry: Date.now() + (10 * 60 * 1000), // 10 minutes
   undoStack: [],
+  // Enhanced completion tracking
+  originalTotalItems: 0,
+  totalAvailableItems: 0,
+  completionStatus: 'active',
+  hasMorePhotosAvailable: false,
+  startMode: 'natural',
   lastUpdated: Date.now(),
   processingStats: {
     totalProcessed: 0,
@@ -301,6 +315,69 @@ const organizationSlice = createSlice({
       state.lastUpdated = now;
     },
 
+    // Set filtered media items for organization
+    setFilteredMediaItems: (state, action: PayloadAction<CachedMediaItem[]>) => {
+      const newItems = action.payload;
+      
+      // Store original total on first load
+      if (state.originalTotalItems === 0 && newItems.length > 0) {
+        state.originalTotalItems = newItems.length;
+      }
+      
+      state.mediaItems = newItems;
+      state.totalItems = newItems.length;
+      
+      // Only reset index if this is the initial load or if we're starting a new session
+      if (state.currentIndex === 0 || !state.currentSession) {
+        state.currentIndex = 0;
+      } else if (state.currentIndex >= newItems.length && newItems.length > 0) {
+        // If we're past the end of the updated queue, adjust to the last item
+        state.currentIndex = newItems.length - 1;
+      } else if (newItems.length === 0) {
+        // If no items left, we're done
+        state.currentIndex = 0;
+      }
+      
+      // Don't automatically set completion status here - let the screen logic handle it
+      // This prevents automatic completion when photos are just being filtered
+      if (newItems.length > 0) {
+        state.completionStatus = 'active';
+      }
+      
+      state.lastUpdated = Date.now();
+    },
+
+    // Update filtered media items without resetting the index (for real-time updates)
+    updateFilteredMediaItems: (state, action: PayloadAction<CachedMediaItem[]>) => {
+      const newItems = action.payload;
+      const previousIndex = state.currentIndex;
+      
+      state.mediaItems = newItems;
+      state.totalItems = newItems.length;
+      
+      // Keep the same index position if possible, otherwise adjust to stay within bounds
+      if (newItems.length === 0) {
+        state.currentIndex = 0;
+        // Don't automatically set completion status when array becomes empty
+        // Only set it if we're explicitly told there are no more photos available
+        // This prevents false completion when photos are temporarily filtered out
+        if (state.completionStatus === 'active') {
+          // Only change to batch_complete if we were previously active and there are truly no more photos
+          // This is more conservative and prevents false positives
+          state.completionStatus = state.hasMorePhotosAvailable ? 'active' : 'batch_complete';
+        }
+      } else if (previousIndex >= newItems.length) {
+        // If we're past the end, stay at the last available item
+        state.currentIndex = Math.max(0, newItems.length - 1);
+        state.completionStatus = 'active';
+      } else {
+        state.completionStatus = 'active';
+      }
+      // Otherwise keep the same index
+      
+      state.lastUpdated = Date.now();
+    },
+
     // Session management actions
     startOrganizationSession: (state, action: PayloadAction<{
       startingPhotoId?: string;
@@ -314,11 +391,19 @@ const organizationSlice = createSlice({
         state.sessionHistory.push(state.currentSession);
       }
 
+      // Store the start mode
+      state.startMode = startMode;
+      
+      // Set original total if not already set
+      if (state.originalTotalItems === 0 && state.mediaItems.length > 0) {
+        state.originalTotalItems = state.mediaItems.length;
+      }
+
       // Create new session
       state.currentSession = {
         id: generateSessionId(),
         startTime: now,
-        startingPhotoId: startingPhotoId || undefined,
+        ...(startingPhotoId && { startingPhotoId }),
         startMode,
         totalItems: state.totalItems,
         processedItems: 0,
@@ -330,6 +415,9 @@ const organizationSlice = createSlice({
 
       // Reset organization state for new session
       state.keepItems = [];
+      
+      // Reset completion status
+      state.completionStatus = state.mediaItems.length > 0 ? 'active' : 'batch_complete';
       state.deleteItems = [];
       state.undoStack = [];
       state.hasUnsavedChanges = false;
@@ -348,7 +436,7 @@ const organizationSlice = createSlice({
           item.organizationStatus !== 'delete'
         );
         state.currentIndex = unreviewed.length > 0 && unreviewed[0] ? 
-          state.mediaItems.findIndex(item => item.id === unreviewed[0].id) : 0;
+          state.mediaItems.findIndex(item => item.id === unreviewed[0]!.id) : 0;
       }
 
       state.lastUpdated = now;
@@ -442,6 +530,52 @@ const organizationSlice = createSlice({
 
       state.lastUpdated = Date.now();
     },
+
+    // Completion status management
+    setCompletionStatus: (state, action: PayloadAction<CompletionStatus>) => {
+      state.completionStatus = action.payload;
+    },
+
+    setHasMorePhotosAvailable: (state, action: PayloadAction<boolean>) => {
+      state.hasMorePhotosAvailable = action.payload;
+      
+      // Update completion status based on availability
+      if (state.mediaItems.length === 0) {
+        state.completionStatus = action.payload ? 'checking_more' : 'all_complete';
+      }
+    },
+
+    setTotalAvailableItems: (state, action: PayloadAction<number>) => {
+      state.totalAvailableItems = action.payload;
+    },
+
+    // Reset completion tracking (for new sessions)
+    resetCompletionTracking: (state) => {
+      state.originalTotalItems = 0;
+      state.totalAvailableItems = 0;
+      state.completionStatus = 'active';
+      state.hasMorePhotosAvailable = false;
+    },
+
+    // Intelligent completion check based on multiple factors
+    checkCompletionStatus: (state, action: PayloadAction<{
+      hasUnreviewedPhotos: boolean;
+      canLoadMore: boolean;
+      isInitialLoad?: boolean;
+    }>) => {
+      const { hasUnreviewedPhotos, canLoadMore, isInitialLoad = false } = action.payload;
+      
+      if (hasUnreviewedPhotos) {
+        // There are photos to review, definitely not complete
+        state.completionStatus = 'active';
+      } else if (canLoadMore) {
+        // No photos in current batch, but more can be loaded
+        state.completionStatus = isInitialLoad ? 'loading_more' : 'checking_more';
+      } else {
+        // No photos to review and no more can be loaded
+        state.completionStatus = 'all_complete';
+      }
+    },
   },
   
   // Handle RTK Query actions
@@ -503,11 +637,18 @@ export const {
   markItemAsProcessed,
   updateItemThumbnail,
   markMultipleItems,
+  setFilteredMediaItems,
+  updateFilteredMediaItems,
   startOrganizationSession,
   commitOrganizationSession,
   discardOrganizationSession,
   saveSessionProgress,
   restoreSessionProgress,
+  setCompletionStatus,
+  setHasMorePhotosAvailable,
+  setTotalAvailableItems,
+  resetCompletionTracking,
+  checkCompletionStatus,
 } = organizationSlice.actions;
 
 // Selectors
@@ -517,16 +658,57 @@ export const selectCurrentMediaItem = (state: { organization: OrganizationState 
   return mediaItems[currentIndex] || null;
 };
 export const selectOrganizationProgress = (state: { organization: OrganizationState }) => {
-  const { currentIndex, totalItems, processingStats } = state.organization;
+  const { 
+    currentIndex, 
+    mediaItems, 
+    processingStats, 
+    originalTotalItems, 
+    totalAvailableItems,
+    completionStatus,
+    startMode 
+  } = state.organization;
+  
+  // Use original total for progress calculation, not current filtered array length
+  const totalForProgress = originalTotalItems > 0 ? originalTotalItems : mediaItems.length;
+  const currentInBatch = mediaItems.length;
+  
+  // Calculate session progress (photos reviewed in this session)
+  const sessionProgress = processingStats.totalProcessed;
+  
   return {
+    // Current position in the filtered batch
     current: currentIndex,
-    total: totalItems,
-    percentage: totalItems > 0 ? (currentIndex / totalItems) * 100 : 0,
-    processed: processingStats.totalProcessed,
-    remaining: Math.max(0, totalItems - currentIndex),
+    // Total in current batch (for batch progress)
+    total: currentInBatch,
+    // Overall progress based on original total
+    overallCurrent: sessionProgress,
+    overallTotal: totalForProgress,
+    // Percentage based on original total, not filtered array
+    percentage: totalForProgress > 0 ? (sessionProgress / totalForProgress) * 100 : 0,
+    // Batch percentage (current batch progress)
+    batchPercentage: currentInBatch > 0 ? (currentIndex / currentInBatch) * 100 : 0,
+    processed: sessionProgress,
+    remaining: Math.max(0, totalForProgress - sessionProgress),
+    // Additional context
+    completionStatus,
+    hasMoreAvailable: totalAvailableItems > totalForProgress,
+    isNaturalMode: startMode === 'natural',
   };
 };
 export const selectOrganizationStats = (state: { organization: OrganizationState }) => state.organization.processingStats;
+
+export const selectCompletionStatus = (state: { organization: OrganizationState }) => {
+  const { completionStatus, hasMorePhotosAvailable, mediaItems, originalTotalItems } = state.organization;
+  
+  return {
+    status: completionStatus,
+    hasMorePhotosAvailable,
+    isComplete: completionStatus === 'all_complete',
+    isBatchComplete: completionStatus === 'batch_complete' || completionStatus === 'checking_more',
+    isLoading: completionStatus === 'loading_more' || completionStatus === 'checking_more',
+    hasProcessedAny: originalTotalItems > 0 || mediaItems.length > 0,
+  };
+};
 export const selectCanUndo = (state: { organization: OrganizationState }) => state.organization.undoAvailable;
 export const selectHasNextPage = (state: { organization: OrganizationState }) => state.organization.hasNextPage;
 export const selectCacheStatus = (state: { organization: OrganizationState }) => {

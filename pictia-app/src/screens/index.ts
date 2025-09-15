@@ -12,3 +12,6 @@ export { BackupScreen } from './BackupScreen';
 // Auth screens
 export { default as LoginScreen } from './auth/LoginScreen';
 export { default as AuthLoadingScreen } from './auth/AuthLoadingScreen';
+
+// Debug screens
+export { default as DebugScreen } from './DebugScreen';

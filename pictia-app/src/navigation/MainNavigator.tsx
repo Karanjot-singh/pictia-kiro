@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { MainTabParamList } from '@/types';
-import { SettingsScreen } from '@/screens';
+import { SettingsScreen, DebugScreen } from '@/screens';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
 
@@ -26,8 +27,9 @@ const UploadScreen: React.FC = () => (
 // SettingsScreen is now imported from @/screens
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createStackNavigator();
 
-const MainNavigator: React.FC = () => {
+const TabNavigator: React.FC = () => {
   const isLocalMode = useAppSelector(selectIsLocalMode);
 
   return (
@@ -75,6 +77,22 @@ const MainNavigator: React.FC = () => {
       {!isLocalMode && <Tab.Screen name="Upload" component={UploadScreen} />}
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
+  );
+};
+
+const MainNavigator: React.FC = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Tabs" component={TabNavigator} />
+      <Stack.Screen 
+        name="Debug" 
+        component={DebugScreen}
+        options={{
+          presentation: 'modal',
+          headerShown: false,
+        }}
+      />
+    </Stack.Navigator>
   );
 };
 

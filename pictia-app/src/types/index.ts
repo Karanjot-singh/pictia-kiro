@@ -175,6 +175,7 @@ export type MainTabParamList = {
   Backup: undefined;
   Upload: undefined;
   Settings: undefined;
+  Debug: undefined;
 };
 
 export type OrganiseStackParamList = {

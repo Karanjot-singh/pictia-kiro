@@ -13,8 +13,9 @@ import {
 import * as MediaLibrary from 'expo-media-library';
 import { useAppSelector } from '@/store/hooks';
 import { selectIsLocalMode } from '@/store/selectors/authSelectors';
-import { SwipeCard, SessionExitModal, SessionStatistics } from '@/components';
+import { SwipeCardStackWithUndo, SessionExitModal, SessionStatistics } from '@/components';
 import { CachedMediaItem } from '@/types';
+import ReviewTracker from '@/services/ReviewTracker';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -73,9 +74,11 @@ const LocalOrganizeScreen: React.FC = () => {
         mediaType: ['photo'],
         first: 50, // Load more items for better experience
         sortBy: MediaLibrary.SortBy.creationTime,
+        // Note: MediaLibrary doesn't have a direct descending option, so we'll sort manually
       });
 
       console.log('Found media items:', media.assets.length);
+      console.log('Sample asset:', media.assets[0]);
 
       if (media.assets.length === 0) {
         console.log('No media items found');
@@ -83,10 +86,13 @@ const LocalOrganizeScreen: React.FC = () => {
         return;
       }
 
+      // Sort assets by creation time (newest first)
+      const sortedAssets = media.assets.sort((a, b) => b.creationTime - a.creationTime);
+      
       // Get asset info for each item to get proper URIs
       const formattedItems: LocalMediaItem[] = [];
       
-      for (const asset of media.assets) {
+      for (const asset of sortedAssets) {
         try {
           const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
           
@@ -115,10 +121,11 @@ const LocalOrganizeScreen: React.FC = () => {
       }
 
       console.log('Formatted items:', formattedItems.length);
+      console.log('Sample formatted item:', formattedItems[0]);
       setMediaItems(formattedItems);
       
       // Convert to CachedMediaItem format for SwipeCardStackWithUndo
-      const cachedItems: CachedMediaItem[] = formattedItems.map(item => ({
+      const allCachedItems: CachedMediaItem[] = formattedItems.map(item => ({
         id: item.id,
         filename: item.filename,
         mimeType: item.mediaType === 'photo' ? 'image/jpeg' : 'video/mp4',
@@ -133,11 +140,19 @@ const LocalOrganizeScreen: React.FC = () => {
         organizationStatus: 'pending',
       }));
       
-      console.log('Sample cached item:', cachedItems[0]);
-      console.log('Total cached items:', cachedItems.length);
-      console.log('Sample URI:', cachedItems[0]?.baseUrl);
+      // Filter out reviewed photos
+      const reviewTracker = ReviewTracker.getInstance();
+      await reviewTracker.initialize();
+      await reviewTracker.refreshUnreviewedQueue(allCachedItems);
+      const unreviewedItems = await reviewTracker.getUnreviewedQueue();
       
-      setCachedMediaItems(cachedItems);
+      console.log('Sample cached item:', unreviewedItems[0]);
+      console.log('Total unreviewed items:', unreviewedItems.length);
+      console.log('Sample URI:', unreviewedItems[0]?.baseUrl);
+      console.log('All cached items length:', allCachedItems.length);
+      console.log('Unreviewed items length:', unreviewedItems.length);
+      
+      setCachedMediaItems(unreviewedItems);
     } catch (error) {
       console.error('Error loading media items:', error);
       Alert.alert(
@@ -158,6 +173,11 @@ const LocalOrganizeScreen: React.FC = () => {
   };
 
   const handleSwipeLeft = useCallback((item: CachedMediaItem) => {
+    if (!item || !item.id) {
+      console.warn('Invalid item passed to handleSwipeLeft');
+      return;
+    }
+
     console.log('Swiping left (delete) on item:', item.filename);
     // Delete action
     setDeletedItems(prev => new Set([...prev, item.id]));
@@ -170,9 +190,28 @@ const LocalOrganizeScreen: React.FC = () => {
     
     // Add to undo stack
     setUndoStack(prev => [...prev, { item, action: 'delete', timestamp: Date.now() }]);
+    
+    // Mark as reviewed immediately for real-time filtering (non-blocking)
+    setTimeout(async () => {
+      try {
+        const reviewTracker = ReviewTracker.getInstance();
+        await reviewTracker.markAsReviewed(item.id, 'delete');
+        
+        // Update the cached media items to remove the reviewed photo
+        const updatedQueue = await reviewTracker.getUnreviewedQueue();
+        setCachedMediaItems(updatedQueue);
+      } catch (error) {
+        console.error('Failed to mark item as reviewed:', error);
+      }
+    }, 0);
   }, []);
 
   const handleSwipeRight = useCallback((item: CachedMediaItem) => {
+    if (!item || !item.id) {
+      console.warn('Invalid item passed to handleSwipeRight');
+      return;
+    }
+
     console.log('Swiping right (keep) on item:', item.filename);
     // Keep action
     setKeepCount(prev => {
@@ -184,6 +223,20 @@ const LocalOrganizeScreen: React.FC = () => {
     
     // Add to undo stack
     setUndoStack(prev => [...prev, { item, action: 'keep', timestamp: Date.now() }]);
+    
+    // Mark as reviewed immediately for real-time filtering (non-blocking)
+    setTimeout(async () => {
+      try {
+        const reviewTracker = ReviewTracker.getInstance();
+        await reviewTracker.markAsReviewed(item.id, 'keep');
+        
+        // Update the cached media items to remove the reviewed photo
+        const updatedQueue = await reviewTracker.getUnreviewedQueue();
+        setCachedMediaItems(updatedQueue);
+      } catch (error) {
+        console.error('Failed to mark item as reviewed:', error);
+      }
+    }, 0);
   }, []);
 
   const handleUndo = useCallback(() => {
@@ -209,48 +262,108 @@ const LocalOrganizeScreen: React.FC = () => {
     
     // Remove from undo stack
     setUndoStack(prev => prev.slice(0, -1));
-  }, [undoStack]);
+    
+    // Remove the review status for the undone item and refresh queue (non-blocking)
+    setTimeout(async () => {
+      try {
+        const reviewTracker = ReviewTracker.getInstance();
+        await reviewTracker.removeReviewStatus(lastAction.item.id);
+        
+        // Rebuild the queue from all media items
+        const allCachedItems: CachedMediaItem[] = mediaItems.map(item => ({
+          id: item.id,
+          filename: item.filename,
+          mimeType: item.mediaType === 'photo' ? 'image/jpeg' : 'video/mp4',
+          baseUrl: item.uri,
+          mediaMetadata: {
+            creationTime: new Date(item.creationTime).toISOString(),
+            width: item.width.toString(),
+            height: item.height.toString(),
+          },
+          cachedAt: Date.now(),
+          lastAccessed: Date.now(),
+          organizationStatus: 'pending',
+        }));
+        
+        await reviewTracker.refreshUnreviewedQueue(allCachedItems);
+        const updatedQueue = await reviewTracker.getUnreviewedQueue();
+        setCachedMediaItems(updatedQueue);
+      } catch (error) {
+        console.error('Failed to remove review status during undo:', error);
+      }
+    }, 0);
+  }, [undoStack, mediaItems]);
 
   const handleCommitSession = useCallback(async () => {
-    if (deletedItems.size === 0) {
-      Alert.alert('No Changes', 'No items are marked for deletion.');
-      return;
-    }
+    try {
+      // Mark all viewed photos as reviewed (include current photo even if no action taken)
+      const viewedPhotoIds: string[] = [];
+      const maxIndex = Math.max(currentIndex, 0);
+      for (let i = 0; i <= maxIndex && i < cachedMediaItems.length; i++) {
+        const item = cachedMediaItems[i];
+        if (item) {
+          viewedPhotoIds.push(item.id);
+        }
+      }
 
-    Alert.alert(
-      'Commit Session',
-      `Are you sure you want to permanently delete ${deletedItems.size} items? This cannot be undone.`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const itemsToDelete = Array.from(deletedItems);
-              await MediaLibrary.deleteAssetsAsync(itemsToDelete);
-              
-              Alert.alert('Success', `${itemsToDelete.length} items deleted successfully.`);
-              
-              // Reset session
-              setDeletedItems(new Set());
-              setCurrentIndex(0);
-              setKeepCount(0);
-              setDeleteCount(0);
-              setUndoStack([]);
-              await loadMediaItems();
-            } catch (error) {
-              console.error('Error deleting items:', error);
-              Alert.alert('Error', 'Failed to delete some items.');
-            }
-          },
-        },
-      ]
-    );
-  }, [deletedItems]);
+      // Check if there's anything to commit
+      if (viewedPhotoIds.length === 0 && deletedItems.size === 0 && keepCount === 0) {
+        Alert.alert(
+          'Nothing to Commit',
+          'No photos have been viewed in this session yet.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Mark photos with their actions or as 'keep' if just viewed
+      const tracker = ReviewTracker.getInstance();
+      await tracker.initialize();
+      
+      for (const photoId of viewedPhotoIds) {
+        if (deletedItems.has(photoId)) {
+          await tracker.markAsReviewed(photoId, 'delete');
+        } else {
+          await tracker.markAsReviewed(photoId, 'keep');
+        }
+      }
+
+      // Delete items marked for deletion
+      if (deletedItems.size > 0) {
+        const itemsToDelete = Array.from(deletedItems);
+        await MediaLibrary.deleteAssetsAsync(itemsToDelete);
+      }
+
+      const totalProcessed = viewedPhotoIds.length;
+      const totalDeleted = deletedItems.size;
+      const totalKept = totalProcessed - totalDeleted;
+
+      if (totalDeleted > 0) {
+        Alert.alert(
+          'Session Committed',
+          `Successfully organized ${totalProcessed} photos:\n• ${totalKept} kept\n• ${totalDeleted} deleted permanently`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Session Committed',
+          `Successfully organized ${totalProcessed} photos. All viewed photos are now marked as reviewed.`,
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Reset session
+      setDeletedItems(new Set());
+      setCurrentIndex(0);
+      setKeepCount(0);
+      setDeleteCount(0);
+      setUndoStack([]);
+      await loadMediaItems();
+    } catch (error) {
+      console.error('Error committing session:', error);
+      Alert.alert('Error', 'Failed to commit session. Please try again.');
+    }
+  }, [deletedItems, currentIndex, cachedMediaItems]);
 
   const handleDiscardSession = useCallback(() => {
     // Reset all session data
@@ -367,10 +480,7 @@ const LocalOrganizeScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Progress indicator */}
-      <View style={styles.progressContainer}>
-        <Text style={styles.progressText}>
-          {currentIndex + 1} of {cachedMediaItems.length}
-        </Text>
+      <View style={styles.progressOverlay}>
         <View style={styles.progressBar}>
           <View 
             style={[
@@ -379,169 +489,68 @@ const LocalOrganizeScreen: React.FC = () => {
             ]} 
           />
         </View>
-        <Text style={styles.statsText}>
-          Keep: {keepCount} • Delete: {deleteCount}
-        </Text>
-        
-        {/* Session Statistics */}
-        <View style={styles.sessionStatsContainer}>
-          <View style={styles.sessionStatsRow}>
-            <View style={styles.sessionStat}>
-              <Text style={styles.sessionStatNumber}>{keepCount + deleteCount}</Text>
-              <Text style={styles.sessionStatLabel}>Total</Text>
-            </View>
-            <View style={styles.sessionStat}>
-              <Text style={[styles.sessionStatNumber, styles.keepColor]}>{keepCount}</Text>
-              <Text style={styles.sessionStatLabel}>Kept</Text>
-            </View>
-            <View style={styles.sessionStat}>
-              <Text style={[styles.sessionStatNumber, styles.deleteColor]}>{deleteCount}</Text>
-              <Text style={styles.sessionStatLabel}>Deleted</Text>
-            </View>
-          </View>
-        </View>
       </View>
+
+      {/* Action Buttons - Fixed position above cards */}
+      {(canUndo || true) && (
+        <View style={styles.actionButtonsContainer}>
+          {canUndo && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.undoButton]}
+              onPress={handleUndo}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionButtonIcon}>↶</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.commitButton]}
+            onPress={handleCommitSession}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.actionButtonIcon}>✓</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Swipe Card Stack */}
       <View style={styles.cardContainer}>
-        {cachedMediaItems.length > 0 && currentIndex < cachedMediaItems.length ? (
-          <View style={styles.cardWrapper}>
-            {/* Simple fallback image display for testing */}
-            <View style={styles.simpleCard}>
-              <Image
-                source={{ uri: cachedMediaItems[currentIndex]?.baseUrl || '' }}
-                style={styles.simpleImage}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.error('Failed to load image:', error.nativeEvent.error);
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully');
-                }}
-              />
-              <View style={styles.simpleCardInfo}>
-                <Text style={styles.simpleCardText}>
-                  {cachedMediaItems[currentIndex]?.filename || 'Unknown'}
-                </Text>
-              </View>
-            </View>
-            
-            {/* Action buttons */}
-            <View style={styles.simpleActions}>
-              <TouchableOpacity
-                style={[styles.simpleActionButton, styles.deleteActionButton]}
-                onPress={() => {
-                  const currentItem = cachedMediaItems[currentIndex];
-                  if (currentItem) {
-                    handleSwipeLeft(currentItem);
-                  }
-                }}
-                activeOpacity={0.8}
-                disabled={!cachedMediaItems[currentIndex]}
-              >
-                <Text style={styles.simpleActionButtonText}>🗑️ Delete</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.simpleActionButton, styles.keepActionButton]}
-                onPress={() => {
-                  const currentItem = cachedMediaItems[currentIndex];
-                  if (currentItem) {
-                    handleSwipeRight(currentItem);
-                  }
-                }}
-                activeOpacity={0.8}
-                disabled={!cachedMediaItems[currentIndex]}
-              >
-                <Text style={styles.simpleActionButtonText}>✅ Keep</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Debug info */}
-            <View style={styles.debugInfo}>
-              <Text style={styles.debugText}>
-                Current: {currentIndex + 1}/{cachedMediaItems.length}
-              </Text>
-              <Text style={styles.debugText}>
-                File: {cachedMediaItems[currentIndex]?.filename}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.centerContainer}>
-            <Text style={styles.loadingText}>
-              {cachedMediaItems.length === 0 ? 'Preparing photos...' : 'No more photos'}
-            </Text>
-            <Text style={styles.debugText}>
-              Items: {cachedMediaItems.length}, Index: {currentIndex}
-            </Text>
-          </View>
-        )}
+        <SwipeCardStackWithUndo
+          mediaItems={cachedMediaItems}
+          currentIndex={currentIndex}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+          onUndo={handleUndo}
+          onCommit={handleCommitSession}
+          canUndo={canUndo}
+          canCommit={true}
+          undoTimeoutMs={5000}
+          actionBarPosition="bottom"
+          enableHaptics={true}
+          swipeThreshold={screenWidth * 0.3}
+          showActionBar={false}
+        />
       </View>
 
-      {/* Action Bar - Always show when there are actions */}
-      <View style={styles.actionBarContainer}>
-        {canUndo && (
-          <TouchableOpacity
-            style={styles.undoButton}
-            onPress={handleUndo}
-          >
-            <Text style={styles.undoButtonText}>Undo Last Action</Text>
-          </TouchableOpacity>
-        )}
-        {hasUnsavedChanges && (
-          <TouchableOpacity
-            style={styles.commitButton}
-            onPress={handleCommitSession}
-          >
-            <Text style={styles.commitButtonText}>
-              Commit Session ({deleteCount} to delete)
-            </Text>
-          </TouchableOpacity>
-        )}
-        {!canUndo && !hasUnsavedChanges && (
-          <View style={styles.noActionsContainer}>
-            {/* Removed instructional text - actions are now clear through buttons */}
+      {/* Session Statistics */}
+      <View style={styles.statsOverlay}>
+        <View style={styles.sessionStatsRow}>
+          <View style={styles.sessionStat}>
+            <Text style={styles.sessionStatNumber}>{keepCount + deleteCount}</Text>
+            <Text style={styles.sessionStatLabel}>Total</Text>
           </View>
-        )}
-      </View>
-
-      {/* Action Buttons */}
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => {
-            const currentItem = cachedMediaItems[currentIndex];
-            if (currentItem) {
-              handleSwipeLeft(currentItem);
-            }
-          }}
-          activeOpacity={0.8}
-          disabled={!cachedMediaItems[currentIndex]}
-        >
-          <Text style={styles.actionButtonText}>Delete</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.keepButton]}
-          onPress={() => {
-            const currentItem = cachedMediaItems[currentIndex];
-            if (currentItem) {
-              handleSwipeRight(currentItem);
-            }
-          }}
-          activeOpacity={0.8}
-          disabled={!cachedMediaItems[currentIndex]}
-        >
-          <Text style={styles.actionButtonText}>Keep</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {isLocalMode && (
-        <View style={styles.localModeIndicator}>
-          <Text style={styles.localModeText}>
-            Local Gallery Mode - No Google Photos sync
-          </Text>
+          <View style={styles.sessionStat}>
+            <Text style={[styles.sessionStatNumber, styles.keepColor]}>{keepCount}</Text>
+            <Text style={styles.sessionStatLabel}>Kept</Text>
+          </View>
+          <View style={styles.sessionStat}>
+            <Text style={[styles.sessionStatNumber, styles.deleteColor]}>{deleteCount}</Text>
+            <Text style={styles.sessionStatLabel}>Deleted</Text>
+          </View>
         </View>
-      )}
+      </View>
+
+
 
       {/* Session Exit Modal */}
       <SessionExitModal
@@ -604,239 +613,74 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 16,
   },
-  progressContainer: {
+
+  progressOverlay: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 20,
     backgroundColor: '#fff',
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   progressBar: {
     height: 4,
     backgroundColor: '#e0e0e0',
     borderRadius: 2,
-    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#007AFF',
     borderRadius: 2,
   },
-  statsText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+    gap: 20,
   },
-  sessionStatsContainer: {
-    marginTop: 12,
+  actionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  undoButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  commitButton: {
+    backgroundColor: 'rgba(52, 199, 89, 0.9)',
+  },
+  actionButtonIcon: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stats: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  photoContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  photo: {
-    width: screenWidth - 40,
-    height: screenHeight * 0.5,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-  },
-  photoInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    justifyContent: 'space-around',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
+  statsOverlay: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-  },
-  keepButton: {
-    backgroundColor: '#34C759',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  localModeIndicator: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  localModeText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-  },
-  actionBarContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    minHeight: 60,
-    gap: 12,
-  },
-  undoButton: {
-    backgroundColor: '#FF9500',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  undoButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  commitButton: {
-    backgroundColor: '#34C759',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  commitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cardWrapper: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  debugInfo: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 8,
-    borderRadius: 4,
-  },
-  debugText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'monospace',
-  },
-  simpleCard: {
-    width: screenWidth * 0.9,
-    height: screenHeight * 0.6,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  simpleImage: {
-    width: '100%',
-    height: '85%',
-  },
-  simpleCardInfo: {
-    padding: 12,
-    backgroundColor: '#fff',
-  },
-  simpleCardText: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
-  },
-  simpleActions: {
-    flexDirection: 'row',
-    marginTop: 20,
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    width: '100%',
-  },
-  simpleActionButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 8,
-    minWidth: 120,
-    flex: 1,
-    marginHorizontal: 10,
-  },
-  deleteActionButton: {
-    backgroundColor: '#FF3B30',
-  },
-  keepActionButton: {
-    backgroundColor: '#34C759',
-  },
-  simpleActionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   sessionStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    padding: 12,
   },
   sessionStat: {
     alignItems: 'center',
@@ -857,10 +701,12 @@ const styles = StyleSheet.create({
   deleteColor: {
     color: '#FF3B30',
   },
-  noActionsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  stats: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
   },
 });
 

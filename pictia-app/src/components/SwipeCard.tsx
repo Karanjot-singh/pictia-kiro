@@ -13,7 +13,6 @@ import { runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { CachedMediaItem, SwipeAction } from '../types';
 import { GestureConfigOptions } from './GestureConfig';
-import CardActionBar from './CardActionBar';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -40,7 +39,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   style,
   undoTimeoutMs = 5000,
 }) => {
-  console.log('SwipeCard rendering with mediaItem:', mediaItem?.filename, mediaItem?.baseUrl);
+  // SwipeCard component for photo organization
   // Default configuration
   const defaultConfig: GestureConfigOptions = {
     swipeThreshold: screenWidth * 0.3,
@@ -57,9 +56,8 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   const rotate = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
   const scale = useRef(new Animated.Value(1)).current;
-  const actionBarOpacity = useRef(new Animated.Value(0)).current;
 
-  const [isActionBarVisible, setIsActionBarVisible] = useState(false);
+
   const hasTriggeredHaptic = useRef(false);
   const hasTriggeredThresholdHaptic = useRef(false);
 
@@ -89,7 +87,6 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   };
 
   const animateCard = (x: number, y: number) => {
-    'worklet';
     const rotation = finalConfig.cardRotationEnabled 
       ? (x / screenWidth) * finalConfig.maxRotationDegrees 
       : 0;
@@ -100,20 +97,11 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
     rotate.setValue(rotation);
     scale.setValue(cardScale);
 
-    // Show action bar when card is being dragged - use runOnJS for state updates
-    const shouldShowActionBar = showActionBar && Math.abs(x) > 20;
-    if (shouldShowActionBar !== isActionBarVisible) {
-      runOnJS(setIsActionBarVisible)(shouldShowActionBar);
-      Animated.timing(actionBarOpacity, {
-        toValue: shouldShowActionBar ? 1 : 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-    }
+    // Visual feedback is handled by overlays
 
     // Trigger threshold haptic feedback when crossing threshold
     if (Math.abs(x) > finalConfig.swipeThreshold) {
-      runOnJS(triggerThresholdHaptic)();
+      triggerThresholdHaptic();
     } else {
       hasTriggeredThresholdHaptic.current = false;
     }
@@ -121,7 +109,6 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
 
   const resetCard = () => {
     resetHapticFlags();
-    setIsActionBarVisible(false);
     
     Animated.parallel([
       Animated.spring(translateX, {
@@ -148,22 +135,15 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
         tension: 100,
         friction: 8,
       }),
-      Animated.timing(actionBarOpacity, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
     ]).start();
   };
 
   const swipeCard = (direction: 'left' | 'right') => {
-    'worklet';
     const toValue = direction === 'right' ? screenWidth * 1.5 : -screenWidth * 1.5;
     const action: SwipeAction = direction === 'right' ? 'keep' : 'delete';
 
-    // Final haptic feedback with enhanced intensity - use runOnJS
-    runOnJS(triggerHapticFeedback)(action, action === 'delete' ? 'heavy' : 'medium');
-    runOnJS(setIsActionBarVisible)(false);
+    // Final haptic feedback with enhanced intensity
+    triggerHapticFeedback(action, action === 'delete' ? 'heavy' : 'medium');
 
     Animated.parallel([
       Animated.timing(translateX, {
@@ -176,17 +156,12 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
         duration: finalConfig.animationDuration,
         useNativeDriver: true,
       }),
-      Animated.timing(actionBarOpacity, {
-        toValue: 0,
-        duration: finalConfig.animationDuration / 2,
-        useNativeDriver: true,
-      }),
     ]).start(() => {
-      // Call the appropriate callback after animation - use runOnJS
+      // Call the appropriate callback after animation
       if (direction === 'left') {
-        runOnJS(onSwipeLeft)(mediaItem);
+        onSwipeLeft(mediaItem);
       } else {
-        runOnJS(onSwipeRight)(mediaItem);
+        onSwipeRight(mediaItem);
       }
     });
   };
@@ -194,7 +169,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       'worklet';
-      animateCard(event.translationX, event.translationY * 0.1); // Reduce vertical movement
+      runOnJS(animateCard)(event.translationX, event.translationY * 0.1); // Reduce vertical movement
     })
     .onEnd((event) => {
       'worklet';
@@ -205,9 +180,9 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
       
       if (shouldSwipe) {
         const direction = translationX > 0 ? 'right' : 'left';
-        swipeCard(direction);
+        runOnJS(swipeCard)(direction);
       } else {
-        resetCard();
+        runOnJS(resetCard)();
       }
     });
 
@@ -218,9 +193,9 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
     
     return translateX.interpolate({
       inputRange: direction === 'left' 
-        ? [-screenWidth, -finalConfig.swipeThreshold, 0] 
-        : [0, finalConfig.swipeThreshold, screenWidth],
-      outputRange: [1, 0.8, 0],
+        ? [-screenWidth, -50, 0] 
+        : [0, 50, screenWidth],
+      outputRange: direction === 'left' ? [0.9, 0.3, 0] : [0, 0.3, 0.9],
       extrapolate: 'clamp',
     });
   };
@@ -253,26 +228,38 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           }}
         />
         
-        {/* Delete Overlay */}
+        {/* Delete Overlay - Only show when swiping left */}
         <Animated.View
           style={[
             styles.overlay,
             styles.deleteOverlay,
             { opacity: getOverlayOpacity('left') },
           ]}
+          pointerEvents="none"
         >
-          <Text style={styles.overlayText}>DELETE</Text>
+          <View style={styles.overlayContent}>
+            <View style={styles.overlayIcon}>
+              <Text style={styles.overlayIconText}>✕</Text>
+            </View>
+            <Text style={styles.overlayText}>DELETE</Text>
+          </View>
         </Animated.View>
 
-        {/* Keep Overlay */}
+        {/* Keep Overlay - Only show when swiping right */}
         <Animated.View
           style={[
             styles.overlay,
             styles.keepOverlay,
             { opacity: getOverlayOpacity('right') },
           ]}
+          pointerEvents="none"
         >
-          <Text style={styles.overlayText}>KEEP</Text>
+          <View style={styles.overlayContent}>
+            <View style={styles.overlayIcon}>
+              <Text style={styles.overlayIconText}>✓</Text>
+            </View>
+            <Text style={styles.overlayText}>KEEP</Text>
+          </View>
         </Animated.View>
 
         {/* Media Info */}
@@ -285,15 +272,7 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           </Text>
         </View>
 
-        {/* Card Action Bar */}
-        <CardActionBar
-          visible={showActionBar && isActionBarVisible}
-          onUndo={onUndo}
-          onCommit={onCommit}
-          position="top"
-          enableHaptics={finalConfig.enableHaptics}
-          style={{ opacity: actionBarOpacity }}
-        />
+
       </Animated.View>
     </GestureDetector>
   );
@@ -302,22 +281,22 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: screenWidth * 0.9,
-    height: screenHeight * 0.7,
+    height: screenHeight * 0.6,
     backgroundColor: '#fff',
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 8,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 12,
     overflow: 'hidden',
   },
   image: {
     width: '100%',
-    height: '85%',
+    height: '100%',
   },
   overlay: {
     position: 'absolute',
@@ -330,25 +309,46 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   deleteOverlay: {
-    backgroundColor: 'rgba(255, 59, 48, 0.8)',
+    backgroundColor: 'rgba(255, 59, 48, 0.85)',
   },
   keepOverlay: {
-    backgroundColor: 'rgba(52, 199, 89, 0.8)',
+    backgroundColor: 'rgba(52, 199, 89, 0.85)',
   },
-  overlayText: {
-    fontSize: 32,
+  overlayContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  overlayIconText: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+  },
+  overlayText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 2,
   },
   infoContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     padding: 16,
   },
   filename: {

@@ -17,6 +17,7 @@ interface BatchActionBarProps {
   onCancel: () => void;
   onSelectAll?: () => void;
   onDeselectAll?: () => void;
+  onMarkAsUnreviewed?: (items: CachedMediaItem[]) => void;
   totalItems: number;
 }
 
@@ -27,6 +28,7 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
   onCancel,
   onSelectAll,
   onDeselectAll,
+  onMarkAsUnreviewed,
   totalItems,
 }) => {
   const selectedCount = selectedItems.length;
@@ -58,6 +60,25 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
     } else {
       onSelectAll?.();
     }
+  };
+
+  const handleMarkAsUnreviewed = () => {
+    if (selectedCount === 0) return;
+
+    Alert.alert(
+      'Mark as Unreviewed',
+      `Mark ${selectedCount} photo${selectedCount > 1 ? 's' : ''} as unreviewed? They will appear in organize mode again.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Mark as Unreviewed',
+          onPress: () => onMarkAsUnreviewed?.(selectedItems),
+        },
+      ]
+    );
   };
 
   if (!isVisible) {
@@ -93,6 +114,34 @@ const BatchActionBar: React.FC<BatchActionBarProps> = ({
               />
               <Text style={styles.actionText}>
                 {allSelected ? 'Deselect All' : 'Select All'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Mark as Unreviewed button */}
+          {onMarkAsUnreviewed && (
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.unreviewedButton,
+                selectedCount === 0 && styles.disabledButton,
+              ]}
+              onPress={handleMarkAsUnreviewed}
+              disabled={selectedCount === 0}
+            >
+              <Ionicons
+                name="refresh"
+                size={24}
+                color={selectedCount === 0 ? '#999' : '#FF9500'}
+              />
+              <Text
+                style={[
+                  styles.actionText,
+                  styles.unreviewedText,
+                  selectedCount === 0 && styles.disabledText,
+                ]}
+              >
+                Unreviewed
               </Text>
             </TouchableOpacity>
           )}
@@ -137,6 +186,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: '#E5E5E7',
+    zIndex: 1000,
   },
   content: {
     flexDirection: 'row',
@@ -177,6 +227,9 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: 'rgba(255, 59, 48, 0.1)',
   },
+  unreviewedButton: {
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+  },
   disabledButton: {
     backgroundColor: 'rgba(153, 153, 153, 0.1)',
   },
@@ -187,6 +240,9 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     color: '#FF3B30',
+  },
+  unreviewedText: {
+    color: '#FF9500',
   },
   disabledText: {
     color: '#999',

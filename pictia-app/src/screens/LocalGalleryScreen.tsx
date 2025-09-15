@@ -17,6 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { OrganiseStackParamList, CachedMediaItem } from '@/types';
 import { FullScreenViewer, BatchActionBar } from '@/components';
+import ReviewTracker from '@/services/ReviewTracker';
 
 const { width: screenWidth } = Dimensions.get('window');
 const GRID_SPACING = 2;
@@ -46,6 +47,8 @@ const LocalGalleryScreen: React.FC = () => {
   const [fullScreenItem, setFullScreenItem] = useState<LocalMediaItem | null>(null);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set());
+  const [deletedItems, setDeletedItems] = useState<Set<string>>(new Set());
+  const [reviewTracker] = useState(() => ReviewTracker.getInstance());
 
   // Calculate thumbnail size
   const thumbnailSize = (screenWidth - GRID_SPACING * (NUM_COLUMNS + 1)) / NUM_COLUMNS;
@@ -67,6 +70,50 @@ const LocalGalleryScreen: React.FC = () => {
       setHasPermission(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const initializeReviewData = async (items: LocalMediaItem[]) => {
+    try {
+      await reviewTracker.initialize();
+      
+      if (items.length > 0) {
+        const reviewedSet = new Set<string>();
+        const deletedSet = new Set<string>();
+        
+        // Convert LocalMediaItem to CachedMediaItem format for ReviewTracker
+        const cachedItems: CachedMediaItem[] = items.map(item => ({
+          id: item.id,
+          filename: item.filename,
+          mimeType: item.mediaType === 'photo' ? 'image/jpeg' : 'video/mp4',
+          baseUrl: item.uri,
+          mediaMetadata: {
+            creationTime: new Date(item.creationTime).toISOString(),
+            width: item.width.toString(),
+            height: item.height.toString(),
+          },
+          cachedAt: Date.now(),
+          lastAccessed: Date.now(),
+        }));
+        
+        // Get deleted photos first (these are filtered out)
+        const deletedPhotos = await reviewTracker.getPhotosByAction(cachedItems, 'delete');
+        deletedPhotos.forEach(photo => {
+          deletedSet.add(photo.id);
+          reviewedSet.add(photo.id);
+        });
+        
+        // Get kept photos
+        const keptPhotos = await reviewTracker.getPhotosByAction(cachedItems, 'keep');
+        keptPhotos.forEach(photo => {
+          reviewedSet.add(photo.id);
+        });
+        
+        setReviewedItems(reviewedSet);
+        setDeletedItems(deletedSet);
+      }
+    } catch (error) {
+      console.error('Failed to initialize review data:', error);
     }
   };
 
@@ -108,6 +155,9 @@ const LocalGalleryScreen: React.FC = () => {
       }
 
       setMediaItems(formattedItems);
+      
+      // Initialize review data
+      await initializeReviewData(formattedItems);
     } catch (error) {
       console.error('Error loading media items:', error);
       Alert.alert(
@@ -120,22 +170,33 @@ const LocalGalleryScreen: React.FC = () => {
 
   // Handle photo press (single tap)
   const handlePhotoPress = useCallback((item: LocalMediaItem) => {
-    if (isMultiSelectMode) {
-      // Toggle selection in multi-select mode
-      setSelectedItems(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(item.id)) {
-          newSet.delete(item.id);
-        } else {
-          newSet.add(item.id);
+    try {
+      if (!item || !item.id) {
+        console.warn('Invalid item passed to handlePhotoPress');
+        return;
+      }
+
+      if (isMultiSelectMode) {
+        // Toggle selection in multi-select mode
+        setSelectedItems(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(item.id)) {
+            newSet.delete(item.id);
+          } else {
+            newSet.add(item.id);
+          }
+          return newSet;
+        });
+      } else {
+        // Open full-screen viewer
+        const index = mediaItems.findIndex(mediaItem => mediaItem && mediaItem.id === item.id);
+        if (index >= 0) {
+          setCurrentPhotoIndex(index);
+          setFullScreenItem(item);
         }
-        return newSet;
-      });
-    } else {
-      // Open full-screen viewer
-      const index = mediaItems.findIndex(mediaItem => mediaItem.id === item.id);
-      setCurrentPhotoIndex(index);
-      setFullScreenItem(item);
+      }
+    } catch (error) {
+      console.error('Error handling photo press:', error);
     }
   }, [isMultiSelectMode, mediaItems]);
 
@@ -165,24 +226,32 @@ const LocalGalleryScreen: React.FC = () => {
 
   // Handle navigation in full-screen viewer
   const handleNavigatePrevious = useCallback(() => {
-    if (currentPhotoIndex > 0) {
-      const newIndex = currentPhotoIndex - 1;
-      setCurrentPhotoIndex(newIndex);
-      const item = mediaItems[newIndex];
-      if (item) {
-        setFullScreenItem(item);
+    try {
+      if (currentPhotoIndex > 0 && mediaItems && mediaItems.length > 0) {
+        const newIndex = currentPhotoIndex - 1;
+        setCurrentPhotoIndex(newIndex);
+        const item = mediaItems[newIndex];
+        if (item) {
+          setFullScreenItem(item);
+        }
       }
+    } catch (error) {
+      console.error('Error navigating to previous photo:', error);
     }
   }, [currentPhotoIndex, mediaItems]);
 
   const handleNavigateNext = useCallback(() => {
-    if (currentPhotoIndex < mediaItems.length - 1) {
-      const newIndex = currentPhotoIndex + 1;
-      setCurrentPhotoIndex(newIndex);
-      const item = mediaItems[newIndex];
-      if (item) {
-        setFullScreenItem(item);
+    try {
+      if (currentPhotoIndex < mediaItems.length - 1 && mediaItems && mediaItems.length > 0) {
+        const newIndex = currentPhotoIndex + 1;
+        setCurrentPhotoIndex(newIndex);
+        const item = mediaItems[newIndex];
+        if (item) {
+          setFullScreenItem(item);
+        }
       }
+    } catch (error) {
+      console.error('Error navigating to next photo:', error);
     }
   }, [currentPhotoIndex, mediaItems]);
 
@@ -192,9 +261,13 @@ const LocalGalleryScreen: React.FC = () => {
       const itemIds = items.map(item => item.id);
       await MediaLibrary.deleteAssetsAsync(itemIds);
       
+      // Mark items as reviewed with delete action
+      await reviewTracker.markMultipleAsReviewed(itemIds, 'delete');
+      
       // Update reviewed items
       const deletedIds = new Set(itemIds);
       setReviewedItems(prev => new Set([...prev, ...deletedIds]));
+      setDeletedItems(prev => new Set([...prev, ...deletedIds]));
       setSelectedItems(new Set());
       setIsMultiSelectMode(false);
 
@@ -214,7 +287,45 @@ const LocalGalleryScreen: React.FC = () => {
         [{ text: 'OK' }]
       );
     }
-  }, []);
+  }, [reviewTracker]);
+
+  // Handle mark as unreviewed
+  const handleMarkAsUnreviewed = useCallback(async (items: CachedMediaItem[]) => {
+    try {
+      // Remove review status for selected items
+      for (const item of items) {
+        await reviewTracker.removeReviewStatus(item.id);
+      }
+
+      // Update local state
+      const unreviewedIds = new Set(items.map(item => item.id));
+      setReviewedItems(prev => {
+        const newSet = new Set(prev);
+        unreviewedIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setDeletedItems(prev => {
+        const newSet = new Set(prev);
+        unreviewedIds.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+      setSelectedItems(new Set());
+      setIsMultiSelectMode(false);
+
+      Alert.alert(
+        'Marked as Unreviewed',
+        `${items.length} photo${items.length > 1 ? 's' : ''} marked as unreviewed. They will appear in organize mode again.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Failed to mark photos as unreviewed:', error);
+      Alert.alert(
+        'Error',
+        'Failed to mark photos as unreviewed. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [reviewTracker]);
 
   // Handle cancel multi-select mode
   const handleCancelMultiSelect = useCallback(() => {
@@ -374,7 +485,7 @@ const LocalGalleryScreen: React.FC = () => {
 
       {/* Photo grid */}
       <FlatList
-        data={mediaItems}
+        data={mediaItems.filter(item => !deletedItems.has(item.id))}
         renderItem={renderPhotoThumbnail}
         keyExtractor={(item) => item.id}
         numColumns={NUM_COLUMNS}
@@ -418,7 +529,8 @@ const LocalGalleryScreen: React.FC = () => {
         onCancel={handleCancelMultiSelect}
         onSelectAll={handleSelectAll}
         onDeselectAll={handleDeselectAll}
-        totalItems={mediaItems.length}
+        onMarkAsUnreviewed={handleMarkAsUnreviewed}
+        totalItems={mediaItems.filter(item => !deletedItems.has(item.id)).length}
       />
 
       {/* Full-screen viewer */}
@@ -522,7 +634,7 @@ const styles = StyleSheet.create({
   gridContainer: {
     paddingHorizontal: GRID_SPACING,
     paddingTop: GRID_SPACING,
-    paddingBottom: GRID_SPACING,
+    paddingBottom: 100, // Add extra padding to avoid overlap with bottom navigation
   },
   row: {
     justifyContent: 'space-between',
