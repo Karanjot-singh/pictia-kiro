@@ -237,6 +237,7 @@
     - _Requirements: 2.7, 3.7, 3.8, 3.11_
 
   - [ ] 13.3 Enhance card action controls
+    - 
     - Move undo button to top-left of card stack (simple undo icon)
     - Add commit button to top-right of card stack (double-check icon)
     - Simplify UI by removing complex action bars and using minimal icon-based controls
